@@ -52,7 +52,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-l);color:
 .btn-edit{background:var(--bleu-l);color:var(--bleu);border:1px solid #b8d0f0;}
 .btn-edit:hover{background:#d0e4f8;}
 .btn-sm{padding:5px 10px;font-size:12px;}
-.btn-icon{padding:5px 8px;font-size:14px;line-height:1;}
+.btn-icon{padding:6px 8px;font-size:15px;line-height:1;background:var(--blanc);border:1px solid var(--gris-m);border-radius:8px;color:var(--gris);box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+.btn-icon:hover{background:var(--gris-l);border-color:var(--gris);}
+.btn-icon.del:hover{background:var(--rouge-l);border-color:#f5c6c6;color:var(--rouge);}
+.btn-icon.edt:hover{background:var(--bleu-l);border-color:#b8d0f0;color:var(--bleu);}
 
 .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
 .badge-vert{background:var(--vert-xl);color:var(--vert);}
@@ -97,11 +100,14 @@ tr:hover td{background:var(--vert-xxl);}
 .produits-cat-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--vert-xxl);border-radius:var(--r-sm);margin-bottom:6px;cursor:pointer;}
 .produits-cat-name{font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.5px;}
 
-.parcelle-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
-.parcelle-card{background:var(--blanc);border-radius:var(--r);padding:14px;box-shadow:var(--ombre);border-top:3px solid var(--vert-l);}
-.parcelle-nom{font-weight:700;color:var(--vert);margin-bottom:6px;font-size:14px;}
-.parcelle-info{font-size:11px;color:var(--gris);margin-bottom:2px;}
-.parcelle-actions{display:flex;gap:6px;margin-top:10px;}
+.parcelle-list{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);overflow:hidden;}
+.parcelle-item{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--gris-l);gap:12px;}
+.parcelle-item:last-child{border-bottom:none;}
+.parcelle-item:hover{background:var(--vert-xxl);}
+.parcelle-left{flex:1;min-width:0;}
+.parcelle-nom{font-weight:700;color:var(--gris);font-size:14px;margin-bottom:3px;}
+.parcelle-info{font-size:12px;color:var(--gris);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.parcelle-actions{display:flex;gap:6px;flex-shrink:0;}
 
 .exploit-card{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);padding:16px;margin-bottom:10px;border-left:4px solid var(--gris-m);}
 .exploit-card.active-exploit{border-left-color:var(--vert-l);}
@@ -176,10 +182,10 @@ tr:hover td{background:var(--vert-xxl);}
 
 <div id="topbar">
   <div>
-    <div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;">Registre Phytosanitaire</div>
-    <h1 id="exploit-name-top">Chargement...</h1>
+    <div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;">🌿 PhytoRegistre</div>
+    <h1 style="font-size:14px;font-weight:500;">Registre Phytosanitaire</h1>
   </div>
-  <div id="exploit-badge" onclick="showPage('exploitations')">Changer</div>
+  <select id="exploit-select" onchange="switchExploit(this.value)" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:20px;padding:6px 12px;font-size:12px;font-family:inherit;max-width:170px;cursor:pointer;outline:none;"></select>
 </div>
 
 <div id="nav">
@@ -255,7 +261,7 @@ tr:hover td{background:var(--vert-xxl);}
       <h2>Parcelles</h2>
       <button class="btn btn-primary btn-sm" onclick="openParcelleModal(null)">+ Ajouter</button>
     </div>
-    <div class="parcelle-grid" id="parcelles-list"></div>
+    <div class="parcelle-list" id="parcelles-list"></div>
   </div>
 
   <!-- EXPLOITATIONS -->
@@ -547,10 +553,13 @@ window.showPage = function(name) {
 
 // ── RENDER ───────────────────────────────────────────────────
 function updateTopbar() {
-  const ex = getEx();
-  if (!ex) return;
-  document.getElementById('exploit-name-top').textContent = ex.nom;
-  document.getElementById('exploit-badge').textContent = ex.nom.split(' ').slice(0,3).join(' ');
+  const sel = document.getElementById('exploit-select');
+  if (!sel) return;
+  const currentVal = sel.value;
+  sel.innerHTML = S.exploitations.map(e =>
+    '<option value="' + e.id + '"' + (e.id === S.currentId ? ' selected' : '') + '>' + e.nom + '</option>'
+  ).join('');
+  if (!sel.value && currentVal) sel.value = currentVal;
 }
 
 function render() {
@@ -611,8 +620,8 @@ function renderPassages(cp) {
       '</div>' +
       '<div class="passage-body" id="pb' + p.id + '">' + (bodyHTML || '<span style="font-size:12px;color:var(--gris);">Aucun produit saisi.</span>') +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
-          '<button class="btn btn-edit btn-icon" onclick="openPassageModal(\'' + p.id + '\')" title="Modifier">✏️</button>' +
-          '<button class="btn btn-danger btn-icon" onclick="delPassage(\'' + p.id + '\')" title="Supprimer">🗑️</button>' +
+          '<button class="btn btn-icon edt" onclick="openPassageModal(\'' + p.id + '\')" title="Modifier">✏️</button>' +
+          '<button class="btn btn-icon del" onclick="delPassage(\'' + p.id + '\')" title="Supprimer">🗑️</button>' +
         '</div>' +
       '</div>' +
     '</div>';
@@ -644,14 +653,14 @@ function renderProduits() {
         '<span class="produits-cat-name">' + cat + '</span>' +
         '<div style="display:flex;align-items:center;gap:8px;">' +
           '<span style="font-size:11px;color:var(--gris);">' + prods.length + ' produit(s)</span>' +
-          (catObj ? '<button class="btn btn-danger btn-icon" onclick="event.stopPropagation();delCat(\'' + catObj.id + '\',\'' + cat + '\')" title="Supprimer">🗑️</button>' : '') +
+          (catObj ? '<button class="btn btn-icon del" onclick="event.stopPropagation();delCat(\'' + catObj.id + '\',\'' + cat + '\')" title="Supprimer">🗑️</button>' : '') +
         '</div>' +
       '</div>' +
       '<div id="' + catKey + '">' +
         '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose</th><th>DRE (h)</th><th>N AMM</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
         (prods.length ? prods.map(p =>
           '<tr><td style="font-weight:600;">' + p.nom + '</td><td>' + (p.dose||'-') + '</td><td>' + (p.dre||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td>' +
-          '<td><div class="td-actions"><button class="btn btn-edit btn-icon" onclick="openProduitModal(\'' + p.id + '\',null)" title="Modifier">✏️</button><button class="btn btn-danger btn-icon" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>'
+          '<td><div class="td-actions"><button class="btn btn-icon edt" onclick="openProduitModal(\'' + p.id + '\',null)" title="Modifier">✏️</button><button class="btn btn-icon del" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>'
         ).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--gris);font-size:12px;padding:12px;">Aucun produit</td></tr>') +
         '</tbody></table></div>' +
         '<button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="openProduitModal(null,\'' + cat + '\')">+ Produit ' + cat + '</button>' +
@@ -708,8 +717,8 @@ function renderExploitations() {
       '</div>' +
       '<div class="exploit-actions">' +
         (e.id !== S.currentId ? '<button class="btn btn-primary btn-sm" onclick="switchExploit(\'' + e.id + '\')">Activer</button>' : '') +
-        '<button class="btn btn-edit btn-icon" onclick="openExploitModal(\'' + e.id + '\')" title="Modifier">✏️</button>' +
-        '<button class="btn btn-danger btn-icon" onclick="delExploit(\'' + e.id + '\',\'' + e.nom + '\')" title="Supprimer">🗑️</button>' +
+        '<button class="btn btn-icon edt" onclick="openExploitModal(\'' + e.id + '\')" title="Modifier">✏️</button>' +
+        '<button class="btn btn-icon del" onclick="delExploit(\'' + e.id + '\',\'' + e.nom + '\')" title="Supprimer">🗑️</button>' +
       '</div>' +
     '</div>'
   ).join('');
@@ -979,10 +988,9 @@ async function saveExploit(eid) {
 }
 
 window.switchExploit = function(id) {
+  if (id === S.currentId) return;
   S.currentId = id;
-  loading(true);
   listenExploit();
-  setTimeout(() => loading(false), 800);
   toast('Exploitation activee');
 };
 
