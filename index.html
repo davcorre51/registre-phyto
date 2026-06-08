@@ -52,8 +52,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-l);color:
 .btn-edit{background:var(--bleu-l);color:var(--bleu);border:1px solid #b8d0f0;}
 .btn-edit:hover{background:#d0e4f8;}
 .btn-sm{padding:5px 10px;font-size:12px;}
-.btn-icon{padding:6px 8px;font-size:15px;line-height:1;background:var(--blanc);border:1px solid var(--gris-m);border-radius:8px;color:var(--gris);box-shadow:0 1px 3px rgba(0,0,0,0.06);}
-.btn-icon:hover{background:var(--gris-l);border-color:var(--gris);}
+.btn-icon{padding:7px 10px;font-size:16px;line-height:1;background:transparent;border:1px solid var(--gris-m);border-radius:8px;color:var(--gris-m);box-shadow:none;transition:all .15s;}
+.btn-icon:hover{background:var(--gris-l);border-color:var(--gris);color:var(--gris);}
 .btn-icon.del:hover{background:var(--rouge-l);border-color:#f5c6c6;color:var(--rouge);}
 .btn-icon.edt:hover{background:var(--bleu-l);border-color:#b8d0f0;color:var(--bleu);}
 
@@ -101,13 +101,12 @@ tr:hover td{background:var(--vert-xxl);}
 .produits-cat-name{font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.5px;}
 
 .parcelle-list{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);overflow:hidden;}
-.parcelle-item{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--gris-l);gap:12px;}
+.parcelle-item{display:flex;align-items:center;justify-content:space-between;padding:16px 16px;border-bottom:1px solid var(--gris-l);gap:12px;}
 .parcelle-item:last-child{border-bottom:none;}
-.parcelle-item:hover{background:var(--vert-xxl);}
 .parcelle-left{flex:1;min-width:0;}
-.parcelle-nom{font-weight:700;color:var(--gris);font-size:14px;margin-bottom:3px;}
-.parcelle-info{font-size:12px;color:var(--gris);opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.parcelle-actions{display:flex;gap:6px;flex-shrink:0;}
+.parcelle-nom{font-weight:700;color:#1a1a1a;font-size:15px;margin-bottom:4px;}
+.parcelle-info{font-size:12px;color:#888;line-height:1.4;}
+.parcelle-actions{display:flex;gap:8px;flex-shrink:0;}
 
 .exploit-card{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);padding:16px;margin-bottom:10px;border-left:4px solid var(--gris-m);}
 .exploit-card.active-exploit{border-left-color:var(--vert-l);}
@@ -209,24 +208,9 @@ tr:hover td{background:var(--vert-xxl);}
     <div class="stats-row">
       <div class="stat-card"><div class="stat-label">Passages</div><div class="stat-val" id="stat-passages">0</div><div class="stat-unit">enregistres</div></div>
       <div class="stat-card ocre"><div class="stat-label">IFT Total</div><div class="stat-val" id="stat-ift">0.0</div><div class="stat-unit">indice freq.</div></div>
-      <div class="stat-card bleu"><div class="stat-label">Cuivre</div><div class="stat-val" id="stat-cuivre">0</div><div class="stat-unit">g/ha cumules</div></div>
       <div class="stat-card rouge"><div class="stat-label">Parcelles</div><div class="stat-val" id="stat-parcelles">0</div><div class="stat-unit">dans l exploitation</div></div>
     </div>
-    <div class="card">
-      <div class="card-title">Suivi Cuivre et Folpel</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-        <div>
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gris);">Cuivre (max 3000 g/ha/an)</div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;"><span id="cuivre-val">0 g/ha</span><span style="color:var(--gris)">/ 3000</span></div>
-          <div class="bar-bg"><div class="bar-fill" id="cuivre-bar" style="width:0%;background:var(--bleu);"></div></div>
-        </div>
-        <div>
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gris);">Folpel (cumule)</div>
-          <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;"><span id="folpel-val">0 g/ha</span><span style="color:var(--gris)">cumules</span></div>
-          <div class="bar-bg"><div class="bar-fill" id="folpel-bar" style="width:0%;background:var(--ocre);"></div></div>
-        </div>
-      </div>
-    </div>
+
     <div class="card">
       <div class="card-title">Derniers passages</div>
       <div id="dash-passages"></div>
@@ -277,7 +261,7 @@ tr:hover td{background:var(--vert-xxl);}
   <div id="page-export" class="page">
     <div class="card">
       <div class="card-title">Export Excel - Programme previsionnel</div>
-      <p style="font-size:13px;color:var(--gris);margin-bottom:14px;line-height:1.6;">Format identique au fichier EI CORRE Christine : passages en colonnes, produits par categorie en lignes, avec DRE, IFT, cuivre et folpel.</p>
+      <p style="font-size:13px;color:var(--gris);margin-bottom:14px;line-height:1.6;">Format identique au fichier EI CORRE Christine : passages en colonnes, produits par categorie en lignes, avec DRE et IFT.</p>
       <div class="form-grid" style="margin-bottom:14px;">
         <div class="form-group"><label>Campagne</label><input type="text" id="export-campagne" value="2026"></div>
         <div class="form-group"><label>Date de recolte</label><input type="date" id="export-recolte"></div>
@@ -566,16 +550,9 @@ function render() {
   updateTopbar();
   const cp = cpPassages();
   const ift = cp.reduce((s,p) => s + (parseFloat(p.ift)||0), 0);
-  const cuivre = cp.reduce((s,p) => s + (parseFloat(p.cuivre)||0), 0);
-  const folpel = cp.reduce((s,p) => s + (parseFloat(p.folpel)||0), 0);
   document.getElementById('stat-passages').textContent = cp.length;
   document.getElementById('stat-ift').textContent = ift.toFixed(2);
-  document.getElementById('stat-cuivre').textContent = Math.round(cuivre);
   document.getElementById('stat-parcelles').textContent = S.parcelles.length;
-  document.getElementById('cuivre-val').textContent = Math.round(cuivre) + ' g/ha';
-  document.getElementById('cuivre-bar').style.width = Math.min(100, cuivre/30) + '%';
-  document.getElementById('folpel-val').textContent = Math.round(folpel) + ' g/ha';
-  document.getElementById('folpel-bar').style.width = Math.min(100, folpel/30) + '%';
   renderDash(cp);
   renderPassages(cp);
   renderProduits();
@@ -761,7 +738,7 @@ window.openPassageModal = function(pid) {
     '<div class="form-grid" style="margin-bottom:12px;">' +
       '<div class="form-group"><label>Passage N</label><input type="number" id="f-num" value="' + (p ? p.num : cpPassages().length+1) + '" min="1"></div>' +
       '<div class="form-group"><label>Campagne</label><input type="text" id="f-camp" value="' + (p ? yearOf(p) : S.campagne) + '"></div>' +
-      '<div class="form-group"><label>Date (JJ/MM/AA)</label><input type="text" id="f-date" value="' + (p ? fmtDate(p.date) : '') + '" placeholder="JJ/MM/AA"></div>' +
+      '<div class="form-group"><label>Date</label><input type="date" id="f-date" value="' + (p ? toISO(p.date) : '') + '"></div>' +
       '<div class="form-group"><label>DRE max (h)</label><input type="number" id="f-dre" value="' + (p ? p.dre||48 : 48) + '"></div>' +
       '<div class="form-group"><label>Heure debut (HH:MM)</label><input type="time" id="f-hdeb" value="' + (p ? p.heureDebut||'' : '') + '"></div>' +
       '<div class="form-group"><label>Heure fin (HH:MM)</label><input type="time" id="f-hfin" value="' + (p ? p.heureFin||'' : '') + '"></div>' +
@@ -788,9 +765,6 @@ window.openPassageModal = function(pid) {
     prodsHTML +
     '<div class="form-grid" style="margin-top:12px;">' +
       '<div class="form-group"><label>IFT du passage</label><input type="number" id="f-ift" step="0.01" value="' + (p?p.ift||'':'') + '" placeholder="2.16"></div>' +
-      '<div class="form-group"><label>Cuivre (g/ha)</label><input type="number" id="f-cuivre" value="' + (p?p.cuivre||'':'') + '"></div>' +
-      '<div class="form-group"><label>Folpel (g/ha)</label><input type="number" id="f-folpel" value="' + (p?p.folpel||'':'') + '"></div>' +
-      '<div class="form-group"><label>Phosphonate (g/ha)</label><input type="number" id="f-phos" value="' + (p?p.phosphonate||'':'') + '"></div>' +
     '</div>' +
     '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="f-notes" rows="2" placeholder="Conditions meteo...">' + (p?p.notes||'':'') + '</textarea></div>';
 
@@ -823,8 +797,9 @@ window.autoFillDose = function(sel) {
 };
 
 async function savePassage(pid) {
-  const dateRaw = document.getElementById('f-date').value.trim();
-  if (!dateRaw) { toast('Veuillez indiquer une date', true); return; }
+  const dateISO = document.getElementById('f-date').value;
+  if (!dateISO) { toast('Veuillez indiquer une date', true); return; }
+  const dateRaw = fmtDate(dateISO);
   const parc = Array.from(document.querySelectorAll('.parc-cb:checked')).map(cb=>cb.value);
   const prodsList = [];
   document.querySelectorAll('.prod-form-row[data-cat]').forEach(row => {
@@ -847,9 +822,6 @@ async function savePassage(pid) {
     parcelles: parc,
     produitsList: prodsList,
     ift: parseFloat(document.getElementById('f-ift').value)||0,
-    cuivre: parseFloat(document.getElementById('f-cuivre').value)||0,
-    folpel: parseFloat(document.getElementById('f-folpel').value)||0,
-    phosphonate: parseFloat(document.getElementById('f-phos').value)||0,
     notes: document.getElementById('f-notes').value,
     updatedAt: serverTimestamp()
   };
@@ -1031,9 +1003,6 @@ window.exportExcel = function() {
     rows.push([]);
   });
   rows.push(['IFT','','','', ...passages.map(p=>[p.ift||0,'','']).flat()]);
-  rows.push(['Cuivre (g/ha)','','','', ...passages.map(p=>[p.cuivre||0,'','']).flat()]);
-  rows.push(['Folpel (g/ha)','','','', ...passages.map(p=>[p.folpel||0,'','']).flat()]);
-  rows.push(['Phosphonate (g/ha)','','','', ...passages.map(p=>[p.phosphonate||0,'','']).flat()]);
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [{wch:22},{wch:8},{wch:8},{wch:14},...Array(Math.max(passages.length,1)*3).fill({wch:14})];
