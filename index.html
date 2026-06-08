@@ -611,13 +611,17 @@ function renderPassages(cp) {
       '</div>' +
       '<div class="passage-body" id="pb' + p.id + '">' + (bodyHTML || '<span style="font-size:12px;color:var(--gris);">Aucun produit saisi.</span>') +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
-          '<button class="btn btn-edit btn-sm" onclick="openPassageModal(\'' + p.id + '\')">Modifier</button>' +
-          '<button class="btn btn-danger btn-sm" onclick="delPassage(\'' + p.id + '\')">Supprimer</button>' +
+          '<button class="btn btn-edit btn-icon" onclick="openPassageModal(\'' + p.id + '\')" title="Modifier">✏️</button>' +
+          '<button class="btn btn-danger btn-icon" onclick="delPassage(\'' + p.id + '\')" title="Supprimer">🗑️</button>' +
         '</div>' +
       '</div>' +
     '</div>';
   }).join('');
 }
+
+window.selectAllParcelles = function(checked) {
+  document.querySelectorAll('.parc-cb').forEach(cb => cb.checked = checked);
+};
 
 window.togglePBody = function(id) {
   const el = document.getElementById(id);
@@ -640,14 +644,14 @@ function renderProduits() {
         '<span class="produits-cat-name">' + cat + '</span>' +
         '<div style="display:flex;align-items:center;gap:8px;">' +
           '<span style="font-size:11px;color:var(--gris);">' + prods.length + ' produit(s)</span>' +
-          (catObj ? '<button class="btn btn-danger btn-icon" onclick="event.stopPropagation();delCat(\'' + catObj.id + '\',\'' + cat + '\')">x</button>' : '') +
+          (catObj ? '<button class="btn btn-danger btn-icon" onclick="event.stopPropagation();delCat(\'' + catObj.id + '\',\'' + cat + '\')" title="Supprimer">🗑️</button>' : '') +
         '</div>' +
       '</div>' +
       '<div id="' + catKey + '">' +
         '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose</th><th>DRE (h)</th><th>N AMM</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
         (prods.length ? prods.map(p =>
           '<tr><td style="font-weight:600;">' + p.nom + '</td><td>' + (p.dose||'-') + '</td><td>' + (p.dre||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td>' +
-          '<td><div class="td-actions"><button class="btn btn-edit btn-icon" onclick="openProduitModal(\'' + p.id + '\',null)">Mod</button><button class="btn btn-danger btn-icon" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')">x</button></div></td></tr>'
+          '<td><div class="td-actions"><button class="btn btn-edit btn-icon" onclick="openProduitModal(\'' + p.id + '\',null)" title="Modifier">✏️</button><button class="btn btn-danger btn-icon" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>'
         ).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--gris);font-size:12px;padding:12px;">Aucun produit</td></tr>') +
         '</tbody></table></div>' +
         '<button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="openProduitModal(null,\'' + cat + '\')">+ Produit ' + cat + '</button>' +
@@ -675,8 +679,8 @@ function renderParcelles() {
       (p.commune ? '<div class="parcelle-info">INSEE : ' + p.commune + '</div>' : '') +
       (p.gps ? '<div class="parcelle-info">GPS : ' + p.gps + '</div>' : '') +
       '<div class="parcelle-actions">' +
-        '<button class="btn btn-edit btn-sm" onclick="openParcelleModal(\'' + p.id + '\')">Modifier</button>' +
-        '<button class="btn btn-danger btn-sm" onclick="delParcelle(\'' + p.id + '\',\'' + p.nom + '\')">Supprimer</button>' +
+        '<button class="btn btn-edit btn-icon" onclick="openParcelleModal(\'' + p.id + '\')" title="Modifier">✏️</button>' +
+        '<button class="btn btn-danger btn-icon" onclick="delParcelle(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button>' +
       '</div>' +
     '</div>'
   ).join('');
@@ -704,8 +708,8 @@ function renderExploitations() {
       '</div>' +
       '<div class="exploit-actions">' +
         (e.id !== S.currentId ? '<button class="btn btn-primary btn-sm" onclick="switchExploit(\'' + e.id + '\')">Activer</button>' : '') +
-        '<button class="btn btn-edit btn-sm" onclick="openExploitModal(\'' + e.id + '\')">Modifier</button>' +
-        '<button class="btn btn-danger btn-sm" onclick="delExploit(\'' + e.id + '\',\'' + e.nom + '\')">Supprimer</button>' +
+        '<button class="btn btn-edit btn-icon" onclick="openExploitModal(\'' + e.id + '\')" title="Modifier">✏️</button>' +
+        '<button class="btn btn-danger btn-icon" onclick="delExploit(\'' + e.id + '\',\'' + e.nom + '\')" title="Supprimer">🗑️</button>' +
       '</div>' +
     '</div>'
   ).join('');
@@ -757,9 +761,19 @@ window.openPassageModal = function(pid) {
       '<label>Stade phenologique</label>' +
       '<select id="f-stade"><option value="">-- Choisir --</option>' + STADES.map(s => '<option value="' + s + '"' + (p&&p.stade===s?' selected':'') + '>' + s + '</option>').join('') + '</select>' +
     '</div>' +
-    '<div class="form-group" style="margin-bottom:12px;">' +
-      '<label>Parcelles traitees (Ctrl+clic pour multiple)</label>' +
-      '<select id="f-parc" multiple size="4">' + parOpts + '</select>' +
+    '<div style="margin-bottom:12px;">' +
+      '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--gris);margin-bottom:6px;">Parcelles traitees</div>' +
+      '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="selectAllParcelles(true)">Toutes</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="selectAllParcelles(false)">Aucune</button>' +
+      '</div>' +
+      '<div id="parc-checks" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
+      S.parcelles.map(pa =>
+        '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--gris-l);border-radius:8px;cursor:pointer;font-size:13px;">' +
+        '<input type="checkbox" class="parc-cb" value="' + pa.nom + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--vert);cursor:pointer;flex-shrink:0;">' +
+        pa.nom + '</label>'
+      ).join('') +
+      '</div>' +
     '</div>' +
     '<div class="section-title">Produits appliques</div>' +
     prodsHTML +
@@ -781,7 +795,7 @@ function prodLineHTML(cat, existing, catProds) {
   return '<div class="prod-form-row" data-cat="' + cat + '">' +
     '<select style="flex:2;" onchange="autoFillDose(this)" class="psel"><option value="">-- Produit --</option>' + opts + '</select>' +
     '<input type="text" placeholder="Dose" style="flex:1;min-width:70px;" class="pdose" value="' + (existing?existing.dose||'':'') + '">' +
-    '<button type="button" class="btn btn-danger btn-icon" onclick="this.closest(\'.prod-form-row\').remove()">x</button>' +
+    '<button type="button" class="btn btn-danger btn-icon" onclick="this.closest(\'.prod-form-row\').remove()" title="Retirer">✕</button>' +
   '</div>';
 }
 
@@ -802,7 +816,7 @@ window.autoFillDose = function(sel) {
 async function savePassage(pid) {
   const dateRaw = document.getElementById('f-date').value.trim();
   if (!dateRaw) { toast('Veuillez indiquer une date', true); return; }
-  const parc = Array.from(document.getElementById('f-parc').selectedOptions).map(o=>o.value);
+  const parc = Array.from(document.querySelectorAll('.parc-cb:checked')).map(cb=>cb.value);
   const prodsList = [];
   document.querySelectorAll('.prod-form-row[data-cat]').forEach(row => {
     const sel = row.querySelector('.psel');
