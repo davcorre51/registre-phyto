@@ -657,20 +657,28 @@ function renderParcelles() {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🗺</div><div class="empty-text">Aucune parcelle</div></div>';
     return;
   }
-  el.innerHTML = S.parcelles.map(p =>
-    '<div class="parcelle-card">' +
-      '<div class="parcelle-nom">' + p.nom + '</div>' +
-      (p.surface ? '<div class="parcelle-info">Surface : ' + p.surface + ' ha</div>' : '') +
-      (p.ilot ? '<div class="parcelle-info">Ilot RPG : ' + p.ilot + '</div>' : '') +
-      (p.commune ? '<div class="parcelle-info">INSEE : ' + p.commune + '</div>' : '') +
-      (p.gps ? '<div class="parcelle-info">GPS : ' + p.gps + '</div>' : '') +
-      '<div class="parcelle-actions">' +
-        '<button class="btn btn-edit btn-icon" onclick="openParcelleModal(\'' + p.id + '\')" title="Modifier">✏️</button>' +
-        '<button class="btn btn-danger btn-icon" onclick="delParcelle(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button>' +
-      '</div>' +
-    '</div>'
-  ).join('');
+  const total = S.parcelles.reduce((s,p) => s + (parseFloat(p.surface)||0), 0);
+  el.innerHTML =
+    '<div class="parcelle-section-title">PARCELLES ENREGISTREES &nbsp;&middot;&nbsp; ' + S.parcelles.length + ' parcelles &nbsp;&middot;&nbsp; ' + total.toFixed(2) + ' ha</div>' +
+    S.parcelles.map(p => {
+      const infos = [];
+      if (p.surface) infos.push(p.surface + ' ha');
+      if (p.commune) infos.push(p.commune);
+      if (p.ilot) infos.push('Ilot ' + p.ilot);
+      if (p.gps) infos.push(p.gps);
+      return '<div class="parcelle-item">' +
+        '<div class="parcelle-left">' +
+          '<div class="parcelle-nom">' + p.nom + '</div>' +
+          (infos.length ? '<div class="parcelle-info">' + infos.join(' · ') + '</div>' : '') +
+        '</div>' +
+        '<div class="parcelle-actions">' +
+          '<button class="btn btn-icon edt" onclick="openParcelleModal(\'' + p.id + '\')" title="Modifier">&#9998;</button>' +
+          '<button class="btn btn-icon del" onclick="delParcelle(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">&#128465;</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
 }
+
 
 function renderExploitations() {
   const el = document.getElementById('exploit-list');
