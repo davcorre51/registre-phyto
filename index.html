@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2d5016">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PhytoRegistre">
+<title>Registre Phytosanitaire</title>
+<style>
+:root {
+  --vert:#2d5016;--vert-m:#3d6b1e;--vert-l:#5a9428;--vert-xl:#e8f3d6;--vert-xxl:#f4f9ec;
+  --ocre:#b8860b;--ocre-l:#f5e6a3;--rouge:#8b1a1a;--rouge-l:#fde8e8;
+  --bleu:#1a4a7a;--bleu-l:#e8f0fb;--gris:#4a4a4a;--gris-l:#f2f2ef;--gris-m:#d0d0c8;--blanc:#fff;
+  --ombre:0 2px 12px rgba(0,0,0,0.08);--r:10px;--r-sm:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-l);color:var(--gris);min-height:100vh;font-size:14px;}
+
+#topbar{background:var(--vert);color:white;padding:0 16px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+#topbar h1{font-size:15px;font-weight:500;}
+#exploit-badge{background:rgba(255,255,255,0.15);border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer;border:1px solid rgba(255,255,255,0.25);transition:background .15s;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#exploit-badge:hover{background:rgba(255,255,255,0.25);}
+
+#nav{background:var(--blanc);border-bottom:1px solid var(--gris-m);display:flex;overflow-x:auto;scrollbar-width:none;position:sticky;top:56px;z-index:90;}
+#nav::-webkit-scrollbar{display:none;}
+.tab{padding:12px 14px;font-size:13px;font-weight:500;color:var(--gris);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;user-select:none;}
+.tab:hover{color:var(--vert);}
+.tab.active{color:var(--vert);border-bottom-color:var(--vert);}
+
+#content{padding:14px;max-width:960px;margin:0 auto;}
+.page{display:none;}
+.page.active{display:block;}
+
+.card{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);padding:16px;margin-bottom:14px;}
+.card-title{font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--vert-xl);}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-group label{font-size:11px;font-weight:600;color:var(--gris);text-transform:uppercase;letter-spacing:.5px;}
+.form-group input,.form-group select,.form-group textarea{border:1px solid var(--gris-m);border-radius:var(--r-sm);padding:8px 10px;font-family:inherit;font-size:13px;color:var(--gris);background:var(--blanc);transition:border-color .15s;}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--vert-l);box-shadow:0 0 0 3px var(--vert-xl);}
+.form-group.full{grid-column:1/-1;}
+
+.btn{padding:8px 16px;border-radius:var(--r-sm);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--vert);color:white;}
+.btn-primary:hover{background:var(--vert-m);}
+.btn-secondary{background:var(--gris-l);color:var(--gris);border:1px solid var(--gris-m);}
+.btn-secondary:hover{background:var(--gris-m);}
+.btn-danger{background:var(--rouge-l);color:var(--rouge);border:1px solid #f5c6c6;}
+.btn-danger:hover{background:#fbd5d5;}
+.btn-edit{background:var(--bleu-l);color:var(--bleu);border:1px solid #b8d0f0;}
+.btn-edit:hover{background:#d0e4f8;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.btn-icon{padding:5px 8px;font-size:14px;line-height:1;}
+
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.badge-vert{background:var(--vert-xl);color:var(--vert);}
+.badge-ocre{background:var(--ocre-l);color:var(--ocre);}
+.badge-rouge{background:var(--rouge-l);color:var(--rouge);}
+.badge-bleu{background:var(--bleu-l);color:var(--bleu);}
+.badge-gris{background:var(--gris-l);color:var(--gris);}
+
+.table-wrap{overflow-x:auto;border-radius:var(--r-sm);border:1px solid var(--gris-m);}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:var(--vert-xxl);color:var(--vert);font-weight:700;padding:8px 10px;text-align:left;border-bottom:2px solid var(--vert-xl);white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
+td{padding:8px 10px;border-bottom:1px solid var(--gris-l);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--vert-xxl);}
+.td-actions{display:flex;gap:4px;justify-content:flex-end;}
+
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;}
+.stat-card{background:var(--blanc);border-radius:var(--r);padding:12px 14px;box-shadow:var(--ombre);border-left:4px solid var(--vert-l);}
+.stat-card.ocre{border-left-color:var(--ocre);}
+.stat-card.rouge{border-left-color:var(--rouge);}
+.stat-card.bleu{border-left-color:var(--bleu);}
+.stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gris);margin-bottom:4px;}
+.stat-val{font-size:22px;font-weight:300;color:var(--vert);}
+.stat-card.ocre .stat-val{color:var(--ocre);}
+.stat-card.rouge .stat-val{color:var(--rouge);}
+.stat-card.bleu .stat-val{color:var(--bleu);}
+.stat-unit{font-size:11px;color:var(--gris);margin-top:2px;}
+
+.passage-item{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);margin-bottom:10px;overflow:hidden;}
+.passage-header{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;background:var(--vert-xxl);user-select:none;}
+.passage-num{background:var(--vert);color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.passage-date{font-size:13px;font-weight:600;color:var(--vert);}
+.passage-meta{font-size:11px;color:var(--gris);margin-top:2px;}
+.passage-right{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+.passage-body{padding:14px 16px;border-top:1px solid var(--vert-xl);display:none;}
+.passage-body.open{display:block;}
+.prod-cat-title{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--vert);margin:8px 0 4px;letter-spacing:.5px;}
+.prod-line{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--gris-l);font-size:12px;}
+.prod-line:last-child{border-bottom:none;}
+
+.produits-cat-section{margin-bottom:16px;}
+.produits-cat-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--vert-xxl);border-radius:var(--r-sm);margin-bottom:6px;cursor:pointer;}
+.produits-cat-name{font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.5px;}
+
+.parcelle-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
+.parcelle-card{background:var(--blanc);border-radius:var(--r);padding:14px;box-shadow:var(--ombre);border-top:3px solid var(--vert-l);}
+.parcelle-nom{font-weight:700;color:var(--vert);margin-bottom:6px;font-size:14px;}
+.parcelle-info{font-size:11px;color:var(--gris);margin-bottom:2px;}
+.parcelle-actions{display:flex;gap:6px;margin-top:10px;}
+
+.exploit-card{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);padding:16px;margin-bottom:10px;border-left:4px solid var(--gris-m);}
+.exploit-card.active-exploit{border-left-color:var(--vert-l);}
+.exploit-nom{font-size:15px;font-weight:700;color:var(--vert);}
+.exploit-siret{font-size:11px;color:var(--gris);margin-top:2px;font-family:monospace;}
+.exploit-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+
+#modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;}
+#modal-overlay.open{display:flex;}
+#modal{background:var(--blanc);border-radius:var(--r);box-shadow:0 8px 40px rgba(0,0,0,0.2);width:100%;max-width:660px;max-height:90vh;overflow-y:auto;}
+#modal-header{padding:16px 20px;border-bottom:1px solid var(--gris-m);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--blanc);z-index:1;}
+#modal-title{font-size:15px;font-weight:700;color:var(--vert);}
+#modal-body{padding:20px;}
+#modal-footer{padding:14px 20px;border-top:1px solid var(--gris-l);display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:var(--blanc);}
+.btn-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--gris);line-height:1;padding:0 4px;}
+
+#confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:none;align-items:center;justify-content:center;padding:20px;}
+#confirm-overlay.open{display:flex;}
+#confirm-box{background:white;border-radius:var(--r);padding:24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.25);}
+#confirm-box h3{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--rouge);}
+#confirm-box p{font-size:13px;color:var(--gris);margin-bottom:20px;line-height:1.5;}
+.btn-row{display:flex;gap:8px;justify-content:center;}
+
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--vert);color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:400;transition:transform .3s;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.2);}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#toast.err{background:var(--rouge);}
+
+#loading{position:fixed;inset:0;background:var(--vert);display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;z-index:500;}
+#loading.hide{display:none;}
+.spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.bar-bg{height:6px;background:var(--gris-l);border-radius:3px;overflow:hidden;margin-top:4px;}
+.bar-fill{height:100%;border-radius:3px;transition:width .5s;}
+
+.section-title{font-size:12px;font-weight:700;color:var(--vert);margin:16px 0 10px;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.5px;}
+.section-title::after{content:'';flex:1;height:1px;background:var(--vert-xl);}
+
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.page-header h2{font-size:16px;font-weight:700;color:var(--vert);}
+
+.empty{text-align:center;padding:40px 20px;color:var(--gris);}
+.empty-icon{font-size:36px;margin-bottom:10px;opacity:.4;}
+.empty-text{font-size:13px;opacity:.6;}
+
+.campagne-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;background:var(--blanc);padding:10px 14px;border-radius:var(--r);box-shadow:var(--ombre);flex-wrap:wrap;}
+.campagne-bar label{font-size:12px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.5px;}
+.campagne-bar select{border:1px solid var(--gris-m);border-radius:var(--r-sm);padding:6px 10px;font-size:13px;color:var(--vert);font-weight:600;background:var(--blanc);}
+
+.prod-form-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;padding:6px;background:var(--gris-l);border-radius:var(--r-sm);}
+.prod-form-row select,.prod-form-row input{font-size:12px;}
+
+.stades-row{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;scrollbar-width:none;}
+.stade-pill{background:var(--vert-xxl);border:1px solid var(--vert-xl);border-radius:20px;padding:3px 10px;font-size:11px;white-space:nowrap;color:var(--vert);font-weight:500;cursor:pointer;}
+.stade-pill:hover{background:var(--vert-xl);}
+
+@media(max-width:600px){
+  .form-grid{grid-template-columns:1fr;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+  #content{padding:10px;}
+  .tab{padding:10px 12px;font-size:12px;}
+  .parcelle-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="font-size:14px;opacity:.8;">Chargement...</div>
+</div>
+
+<div id="topbar">
+  <div>
+    <div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;">Registre Phytosanitaire</div>
+    <h1 id="exploit-name-top">Chargement...</h1>
+  </div>
+  <div id="exploit-badge" onclick="showPage('exploitations')">Changer</div>
+</div>
+
+<div id="nav">
+  <div class="tab active" onclick="showPage('dashboard')">Tableau de bord</div>
+  <div class="tab" onclick="showPage('passages')">Passages</div>
+  <div class="tab" onclick="showPage('produits')">Produits</div>
+  <div class="tab" onclick="showPage('parcelles')">Parcelles</div>
+  <div class="tab" onclick="showPage('exploitations')">Exploitations</div>
+  <div class="tab" onclick="showPage('export')">Export</div>
+</div>
+
+<div id="content">
+
+  <!-- DASHBOARD -->
+  <div id="page-dashboard" class="page active">
+    <div class="campagne-bar">
+      <label>Campagne</label>
+      <select id="campagne-select" onchange="onCampagneChange()"></select>
+      <button class="btn btn-secondary btn-sm" onclick="newCampagne()">+ Nouvelle</button>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Passages</div><div class="stat-val" id="stat-passages">0</div><div class="stat-unit">enregistres</div></div>
+      <div class="stat-card ocre"><div class="stat-label">IFT Total</div><div class="stat-val" id="stat-ift">0.0</div><div class="stat-unit">indice freq.</div></div>
+      <div class="stat-card bleu"><div class="stat-label">Cuivre</div><div class="stat-val" id="stat-cuivre">0</div><div class="stat-unit">g/ha cumules</div></div>
+      <div class="stat-card rouge"><div class="stat-label">Parcelles</div><div class="stat-val" id="stat-parcelles">0</div><div class="stat-unit">dans l exploitation</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Suivi Cuivre et Folpel</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gris);">Cuivre (max 3000 g/ha/an)</div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;"><span id="cuivre-val">0 g/ha</span><span style="color:var(--gris)">/ 3000</span></div>
+          <div class="bar-bg"><div class="bar-fill" id="cuivre-bar" style="width:0%;background:var(--bleu);"></div></div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--gris);">Folpel (cumule)</div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px;"><span id="folpel-val">0 g/ha</span><span style="color:var(--gris)">cumules</span></div>
+          <div class="bar-bg"><div class="bar-fill" id="folpel-bar" style="width:0%;background:var(--ocre);"></div></div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Derniers passages</div>
+      <div id="dash-passages"></div>
+      <button class="btn btn-primary" style="margin-top:12px;" onclick="openPassageModal(null)">+ Nouveau passage</button>
+    </div>
+  </div>
+
+  <!-- PASSAGES -->
+  <div id="page-passages" class="page">
+    <div class="page-header">
+      <h2>Passages de traitement</h2>
+      <button class="btn btn-primary btn-sm" onclick="openPassageModal(null)">+ Ajouter</button>
+    </div>
+    <div id="passages-list"></div>
+  </div>
+
+  <!-- PRODUITS -->
+  <div id="page-produits" class="page">
+    <div class="page-header">
+      <h2>Base de produits</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="openCatModal()">+ Categorie</button>
+        <button class="btn btn-primary btn-sm" onclick="openProduitModal(null,null)">+ Produit</button>
+      </div>
+    </div>
+    <div id="produits-sections"></div>
+  </div>
+
+  <!-- PARCELLES -->
+  <div id="page-parcelles" class="page">
+    <div class="page-header">
+      <h2>Parcelles</h2>
+      <button class="btn btn-primary btn-sm" onclick="openParcelleModal(null)">+ Ajouter</button>
+    </div>
+    <div class="parcelle-grid" id="parcelles-list"></div>
+  </div>
+
+  <!-- EXPLOITATIONS -->
+  <div id="page-exploitations" class="page">
+    <div class="page-header">
+      <h2>Mes exploitations</h2>
+      <button class="btn btn-primary btn-sm" onclick="openExploitModal(null)">+ Nouvelle</button>
+    </div>
+    <div id="exploit-list"></div>
+  </div>
+
+  <!-- EXPORT -->
+  <div id="page-export" class="page">
+    <div class="card">
+      <div class="card-title">Export Excel - Programme previsionnel</div>
+      <p style="font-size:13px;color:var(--gris);margin-bottom:14px;line-height:1.6;">Format identique au fichier EI CORRE Christine : passages en colonnes, produits par categorie en lignes, avec DRE, IFT, cuivre et folpel.</p>
+      <div class="form-grid" style="margin-bottom:14px;">
+        <div class="form-group"><label>Campagne</label><input type="text" id="export-campagne" value="2026"></div>
+        <div class="form-group"><label>Date de recolte</label><input type="date" id="export-recolte"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="exportExcel()">Telecharger Excel</button>
+        <button class="btn btn-secondary" onclick="exportCSV()">CSV reglementaire 2026</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Mentions reglementaires 2026</div>
+      <table>
+        <tr><td style="font-weight:600;color:var(--vert);padding:6px 10px;white-space:nowrap;">Arrete applicable</td><td style="padding:6px 10px;">24 decembre 2025</td></tr>
+        <tr><td style="font-weight:600;color:var(--vert);padding:6px 10px;">Format numerique obligatoire</td><td style="padding:6px 10px;">A partir du 1er janvier 2027</td></tr>
+        <tr><td style="font-weight:600;color:var(--vert);padding:6px 10px;">Conservation</td><td style="padding:6px 10px;">5 ans minimum</td></tr>
+        <tr><td style="font-weight:600;color:var(--vert);padding:6px 10px;">Nouvelles mentions</td><td style="padding:6px 10px;">N SIRET, N AMM, label AB, horaires, stade BBCH</td></tr>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div id="modal">
+    <div id="modal-header">
+      <div id="modal-title">Modal</div>
+      <button class="btn-close" onclick="closeModal()">x</button>
+    </div>
+    <div id="modal-body"></div>
+    <div id="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" id="modal-save-btn">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM -->
+<div id="confirm-overlay">
+  <div id="confirm-box">
+    <h3 id="confirm-title">Confirmer</h3>
+    <p id="confirm-msg">Cette action est irreversible.</p>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="closeConfirm()">Annuler</button>
+      <button class="btn btn-danger" id="confirm-ok-btn">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyARkXeCqBH2lSbfG_YsTuMJfY6NtUrwosg",
+  authDomain: "registre-phytos.firebaseapp.com",
+  projectId: "registre-phytos",
+  storageBucket: "registre-phytos.firebasestorage.app",
+  messagingSenderId: "59831753473",
+  appId: "1:59831753473:web:80870d9b89043e8f5fd900"
+};
+
+const fbApp = initializeApp(firebaseConfig);
+const db = getFirestore(fbApp);
+
+// ── CONSTANTES ──────────────────────────────────────────────
+const STADES = [
+  'Bourgeon dans le coton','Feuilles etalees','Grappes visibles',
+  'Grappes separees','Boutons floraux separes','Debut fleur',
+  'Pleine fleur','Nouaison','Grain de pois',
+  'Debut fermeture grappe','Fin fermeture grappe'
+];
+const DEF_CATS = ['Mildiou','Oidium','Biocontrole / SDN','Adjuvants','Botrytis','Nutrition foliaire','Insecticides'];
+const DEF_PRODUITS = [
+  {nom:'HELIOCUIVRE',cat:'Mildiou',dre:48,amm:'',dose:'1L/HA'},
+  {nom:'FANTIC',cat:'Mildiou',dre:48,amm:'',dose:'2KG/HA'},
+  {nom:'FUTURA',cat:'Mildiou',dre:48,amm:'',dose:'4L/HA'},
+  {nom:'PEXIUM',cat:'Mildiou',dre:48,amm:'',dose:'0,5KG/HA'},
+  {nom:'ZORVEC',cat:'Mildiou',dre:48,amm:'',dose:'0,2L/HA'},
+  {nom:'VIDERYO',cat:'Mildiou',dre:48,amm:'',dose:'2,5L/HA'},
+  {nom:'ELECTIS BLEU',cat:'Mildiou',dre:24,amm:'',dose:'1,96L/HA'},
+  {nom:'FOLPAN',cat:'Mildiou',dre:48,amm:'',dose:'1,25KG/HA'},
+  {nom:'MICROTHIOL',cat:'Oidium',dre:6,amm:'',dose:'10KG/HA'},
+  {nom:'VIVANDO',cat:'Oidium',dre:6,amm:'',dose:'0,2L/HA'},
+  {nom:'YARIS',cat:'Oidium',dre:48,amm:'',dose:'0,15L/HA'},
+  {nom:'HOGGAR',cat:'Oidium',dre:48,amm:'',dose:'0,6L/HA'},
+  {nom:'REVYVIT',cat:'Oidium',dre:48,amm:'',dose:'2L/HA'},
+  {nom:'LUNA XTEND',cat:'Oidium',dre:48,amm:'',dose:'0,2L/HA'},
+  {nom:'THIOPRON RAIN FREE',cat:'Oidium',dre:48,amm:'',dose:'6,8L/HA'},
+  {nom:'REDELI',cat:'Biocontrole / SDN',dre:0,amm:'',dose:'2,5L/Ha'},
+  {nom:'VINIVAX',cat:'Biocontrole / SDN',dre:0,amm:'',dose:'1L/Ha'},
+  {nom:'INVELOP',cat:'Biocontrole / SDN',dre:0,amm:'',dose:'10KG/HA'},
+  {nom:'STICMAN',cat:'Adjuvants',dre:0,amm:'',dose:'0,14L/HL'},
+  {nom:'ISOTAC',cat:'Adjuvants',dre:0,amm:'',dose:'0,3L/HL'},
+  {nom:'GEOXE',cat:'Botrytis',dre:0,amm:'',dose:'1KG/HA'},
+  {nom:'Nutribio Fe',cat:'Nutrition foliaire',dre:0,amm:'',dose:'3L/Ha'},
+  {nom:'VIVAFLOR',cat:'Nutrition foliaire',dre:0,amm:'',dose:'3L/Ha'}
+];
+const DEF_PARCELLES = [
+  {nom:'CHALMONTS',surface:0.4,ilot:'',commune:'',gps:''},
+  {nom:'SABLONS',surface:0.35,ilot:'',commune:'',gps:''},
+  {nom:'LES MACHERETS',surface:0.3,ilot:'',commune:'',gps:''},
+  {nom:'PINOCHES',surface:0.25,ilot:'',commune:'',gps:''},
+  {nom:'FOSSES BLANCS',surface:0.42,ilot:'',commune:'',gps:''},
+  {nom:'LES PARADIS',surface:0.38,ilot:'',commune:'',gps:''},
+  {nom:'FONTAINE DENIS',surface:0.5,ilot:'',commune:'',gps:''},
+  {nom:'LA CHAUX',surface:0.32,ilot:'',commune:'',gps:''}
+];
+
+// ── STATE ───────────────────────────────────────────────────
+const S = {
+  exploitations: [],
+  currentId: null,
+  campagne: String(new Date().getFullYear()),
+  passages: [],
+  produits: [],
+  parcelles: [],
+  categories: [],
+  unsubs: []
+};
+
+// ── CHEMINS FIRESTORE ────────────────────────────────────────
+const exploitsCol = () => collection(db, 'exploitations');
+const exploitDoc = id => doc(db, 'exploitations', id);
+const sub = (eid, name) => collection(db, 'exploitations', eid, name);
+const subdoc = (eid, name, id) => doc(db, 'exploitations', eid, name, id);
+
+// ── UTILS ────────────────────────────────────────────────────
+function fmtDate(v) {
+  if (!v) return '';
+  if (v.includes('-')) {
+    const [y,m,d] = v.split('-');
+    return d + '/' + m + '/' + String(y).slice(-2);
+  }
+  return v;
+}
+function toISO(v) {
+  if (!v) return '';
+  if (v.includes('/')) {
+    const p = v.split('/');
+    if (p.length === 3) {
+      const y = p[2].length === 2 ? '20' + p[2] : p[2];
+      return y + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
+    }
+  }
+  return v;
+}
+function yearOf(p) {
+  if (p.campagne) return p.campagne;
+  const iso = toISO(p.date);
+  return iso ? iso.slice(0,4) : String(new Date().getFullYear());
+}
+function cpPassages() { return S.passages.filter(p => yearOf(p) === S.campagne); }
+function getEx() { return S.exploitations.find(e => e.id === S.currentId); }
+
+function toast(msg, err) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = err ? 'err show' : 'show';
+  setTimeout(() => { t.className = ''; }, 2800);
+}
+function loading(v) {
+  document.getElementById('loading').className = v ? '' : 'hide';
+}
+
+// confirm dialog
+let confirmCb = null;
+window.closeConfirm = function() {
+  document.getElementById('confirm-overlay').classList.remove('open');
+  confirmCb = null;
+};
+document.getElementById('confirm-ok-btn').onclick = function() {
+  if (confirmCb) confirmCb();
+  closeConfirm();
+};
+function confirm2(title, msg, cb) {
+  document.getElementById('confirm-title').textContent = title;
+  document.getElementById('confirm-msg').textContent = msg;
+  document.getElementById('confirm-overlay').classList.add('open');
+  confirmCb = cb;
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+async function init() {
+  loading(true);
+  // Ecoute exploitations
+  onSnapshot(exploitsCol(), snap => {
+    S.exploitations = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    if (!S.currentId && S.exploitations.length > 0) {
+      S.currentId = S.exploitations[0].id;
+      listenExploit();
+    }
+    if (S.exploitations.length === 0) {
+      createDefaultExploit();
+    }
+    renderExploitations();
+    updateTopbar();
+    loading(false);
+  });
+}
+
+async function createDefaultExploit() {
+  const ref = await addDoc(exploitsCol(), {
+    nom: 'EI CORRE Christine', siret: '', certiphyto: '',
+    surface: 2.92, ab: false, createdAt: serverTimestamp()
+  });
+  S.currentId = ref.id;
+  const eid = ref.id;
+  for (const p of DEF_PARCELLES) await addDoc(sub(eid,'parcelles'), p);
+  for (const p of DEF_PRODUITS) await addDoc(sub(eid,'produits'), p);
+  for (const c of DEF_CATS) await addDoc(sub(eid,'categories'), {nom: c});
+  listenExploit();
+}
+
+function listenExploit() {
+  S.unsubs.forEach(u => u());
+  S.unsubs = [];
+  const eid = S.currentId;
+  if (!eid) return;
+
+  S.unsubs.push(onSnapshot(sub(eid,'passages'), snap => {
+    S.passages = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.passages.sort((a,b) => toISO(a.date) < toISO(b.date) ? -1 : 1);
+    updateCampagneSelector();
+    render();
+  }));
+  S.unsubs.push(onSnapshot(sub(eid,'produits'), snap => {
+    S.produits = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.produits.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
+  S.unsubs.push(onSnapshot(sub(eid,'parcelles'), snap => {
+    S.parcelles = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.parcelles.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
+  S.unsubs.push(onSnapshot(sub(eid,'categories'), snap => {
+    S.categories = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.categories.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
+}
+
+// ── CAMPAGNE ─────────────────────────────────────────────────
+function updateCampagneSelector() {
+  const years = [...new Set(S.passages.map(p => yearOf(p)))].sort().reverse();
+  const cur = String(new Date().getFullYear());
+  if (!years.includes(cur)) years.unshift(cur);
+  if (!years.includes(S.campagne)) S.campagne = years[0] || cur;
+  const sel = document.getElementById('campagne-select');
+  sel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === S.campagne ? ' selected' : '') + '>' + y + '</option>').join('');
+}
+window.onCampagneChange = function() {
+  S.campagne = document.getElementById('campagne-select').value;
+  render();
+};
+window.newCampagne = function() {
+  const y = prompt('Annee de la nouvelle campagne :', String(new Date().getFullYear() + 1));
+  if (y && /^\d{4}$/.test(y)) { S.campagne = y; updateCampagneSelector(); render(); }
+};
+
+// ── NAV ──────────────────────────────────────────────────────
+window.showPage = function(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const map = {dashboard:0, passages:1, produits:2, parcelles:3, exploitations:4, export:5};
+  if (map[name] !== undefined) document.querySelectorAll('.tab')[map[name]].classList.add('active');
+};
+
+// ── RENDER ───────────────────────────────────────────────────
+function updateTopbar() {
+  const ex = getEx();
+  if (!ex) return;
+  document.getElementById('exploit-name-top').textContent = ex.nom;
+  document.getElementById('exploit-badge').textContent = ex.nom.split(' ').slice(0,3).join(' ');
+}
+
+function render() {
+  updateTopbar();
+  const cp = cpPassages();
+  const ift = cp.reduce((s,p) => s + (parseFloat(p.ift)||0), 0);
+  const cuivre = cp.reduce((s,p) => s + (parseFloat(p.cuivre)||0), 0);
+  const folpel = cp.reduce((s,p) => s + (parseFloat(p.folpel)||0), 0);
+  document.getElementById('stat-passages').textContent = cp.length;
+  document.getElementById('stat-ift').textContent = ift.toFixed(2);
+  document.getElementById('stat-cuivre').textContent = Math.round(cuivre);
+  document.getElementById('stat-parcelles').textContent = S.parcelles.length;
+  document.getElementById('cuivre-val').textContent = Math.round(cuivre) + ' g/ha';
+  document.getElementById('cuivre-bar').style.width = Math.min(100, cuivre/30) + '%';
+  document.getElementById('folpel-val').textContent = Math.round(folpel) + ' g/ha';
+  document.getElementById('folpel-bar').style.width = Math.min(100, folpel/30) + '%';
+  renderDash(cp);
+  renderPassages(cp);
+  renderProduits();
+  renderParcelles();
+  renderExploitations();
+}
+
+function renderDash(cp) {
+  const el = document.getElementById('dash-passages');
+  if (!cp.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🌿</div><div class="empty-text">Aucun passage pour cette campagne</div></div>';
+    return;
+  }
+  const last5 = [...cp].reverse().slice(0,5);
+  el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>N</th><th>Date</th><th>Stade</th><th>Produits</th><th>IFT</th></tr></thead><tbody>' +
+    last5.map(p => '<tr><td><span class="badge badge-vert">' + (p.num||'-') + '</span></td><td>' + fmtDate(p.date) + '</td><td style="font-size:11px;max-width:110px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + (p.stade||'-') + '</td><td style="font-size:11px;">' + (p.produitsList||[]).slice(0,2).map(pr=>pr.nom).join(', ') + ((p.produitsList||[]).length>2?'...':'') + '</td><td><span class="badge badge-ocre">' + (parseFloat(p.ift)||0).toFixed(2) + '</span></td></tr>').join('') +
+    '</tbody></table></div>';
+}
+
+function renderPassages(cp) {
+  const el = document.getElementById('passages-list');
+  if (!cp || !cp.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Aucun passage - cliquez sur + Ajouter</div></div>';
+    return;
+  }
+  el.innerHTML = [...cp].reverse().map(p => {
+    const prods = p.produitsList || [];
+    const byCat = {};
+    prods.forEach(pr => { if (!byCat[pr.cat]) byCat[pr.cat] = []; byCat[pr.cat].push(pr); });
+    const bodyHTML = Object.entries(byCat).map(([cat,list]) =>
+      '<div class="prod-cat-title">' + cat + '</div>' +
+      list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span class="badge badge-gris">' + (pr.dose||'') + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;">DRE ' + pr.dre + 'h</span>' : '') + '</div>').join('')
+    ).join('') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + p.notes + '</div>' : '');
+
+    return '<div class="passage-item">' +
+      '<div class="passage-header" onclick="togglePBody(\'pb' + p.id + '\')">' +
+        '<div class="passage-num">' + (p.num||'?') + '</div>' +
+        '<div><div class="passage-date">' + fmtDate(p.date) + (p.heureDebut ? ' — ' + p.heureDebut : '') + '</div>' +
+        '<div class="passage-meta">' + ((p.parcelles||[]).join(', ')||'Toutes parcelles') + '</div></div>' +
+        '<div class="passage-right"><div style="font-size:11px;color:var(--gris);text-align:right;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.stade||'') + '</div>' +
+        '<div style="display:flex;gap:4px;"><span class="badge badge-ocre">IFT ' + (parseFloat(p.ift)||0).toFixed(2) + '</span>' + (p.dre ? '<span class="badge badge-rouge">DRE ' + p.dre + 'h</span>' : '') + '</div></div>' +
+      '</div>' +
+      '<div class="passage-body" id="pb' + p.id + '">' + (bodyHTML || '<span style="font-size:12px;color:var(--gris);">Aucun produit saisi.</span>') +
+        '<div style="display:flex;gap:8px;margin-top:12px;">' +
+          '<button class="btn btn-edit btn-sm" onclick="openPassageModal(\'' + p.id + '\')">Modifier</button>' +
+          '<button class="btn btn-danger btn-sm" onclick="delPassage(\'' + p.id + '\')">Supprimer</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+window.togglePBody = function(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+};
+
+function renderProduits() {
+  const el = document.getElementById('produits-sections');
+  const catNames = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(p=>p.cat)])];
+  if (!catNames.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🌿</div><div class="empty-text">Aucun produit</div></div>';
+    return;
+  }
+  el.innerHTML = catNames.map(cat => {
+    const prods = S.produits.filter(p => p.cat === cat);
+    const catObj = S.categories.find(c => c.nom === cat);
+    const catKey = 'c' + cat.replace(/[^a-z0-9]/gi,'');
+    return '<div class="produits-cat-section">' +
+      '<div class="produits-cat-header" onclick="toggleCat(\'' + catKey + '\')">' +
+        '<span class="produits-cat-name">' + cat + '</span>' +
+        '<div style="display:flex;align-items:center;gap:8px;">' +
+          '<span style="font-size:11px;color:var(--gris);">' + prods.length + ' produit(s)</span>' +
+          (catObj ? '<button class="btn btn-danger btn-icon" onclick="event.stopPropagation();delCat(\'' + catObj.id + '\',\'' + cat + '\')">x</button>' : '') +
+        '</div>' +
+      '</div>' +
+      '<div id="' + catKey + '">' +
+        '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose</th><th>DRE (h)</th><th>N AMM</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
+        (prods.length ? prods.map(p =>
+          '<tr><td style="font-weight:600;">' + p.nom + '</td><td>' + (p.dose||'-') + '</td><td>' + (p.dre||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td>' +
+          '<td><div class="td-actions"><button class="btn btn-edit btn-icon" onclick="openProduitModal(\'' + p.id + '\',null)">Mod</button><button class="btn btn-danger btn-icon" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')">x</button></div></td></tr>'
+        ).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--gris);font-size:12px;padding:12px;">Aucun produit</td></tr>') +
+        '</tbody></table></div>' +
+        '<button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="openProduitModal(null,\'' + cat + '\')">+ Produit ' + cat + '</button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+window.toggleCat = function(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+};
+
+function renderParcelles() {
+  const el = document.getElementById('parcelles-list');
+  if (!S.parcelles.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🗺</div><div class="empty-text">Aucune parcelle</div></div>';
+    return;
+  }
+  el.innerHTML = S.parcelles.map(p =>
+    '<div class="parcelle-card">' +
+      '<div class="parcelle-nom">' + p.nom + '</div>' +
+      (p.surface ? '<div class="parcelle-info">Surface : ' + p.surface + ' ha</div>' : '') +
+      (p.ilot ? '<div class="parcelle-info">Ilot RPG : ' + p.ilot + '</div>' : '') +
+      (p.commune ? '<div class="parcelle-info">INSEE : ' + p.commune + '</div>' : '') +
+      (p.gps ? '<div class="parcelle-info">GPS : ' + p.gps + '</div>' : '') +
+      '<div class="parcelle-actions">' +
+        '<button class="btn btn-edit btn-sm" onclick="openParcelleModal(\'' + p.id + '\')">Modifier</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="delParcelle(\'' + p.id + '\',\'' + p.nom + '\')">Supprimer</button>' +
+      '</div>' +
+    '</div>'
+  ).join('');
+}
+
+function renderExploitations() {
+  const el = document.getElementById('exploit-list');
+  if (!S.exploitations.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-text">Aucune exploitation</div></div>';
+    return;
+  }
+  el.innerHTML = S.exploitations.map(e =>
+    '<div class="exploit-card ' + (e.id === S.currentId ? 'active-exploit' : '') + '">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;">' +
+        '<div>' +
+          '<div class="exploit-nom">' + e.nom + '</div>' +
+          '<div class="exploit-siret">SIRET : ' + (e.siret||'Non renseigne') + '</div>' +
+          (e.certiphyto ? '<div class="exploit-siret">Certiphyto : ' + e.certiphyto + '</div>' : '') +
+        '</div>' +
+        (e.id === S.currentId ? '<span class="badge badge-vert">Active</span>' : '') +
+      '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">' +
+        '<span class="badge badge-gris">' + (e.surface||0) + ' ha</span>' +
+        (e.ab ? '<span class="badge badge-vert">Agriculture Biologique</span>' : '') +
+      '</div>' +
+      '<div class="exploit-actions">' +
+        (e.id !== S.currentId ? '<button class="btn btn-primary btn-sm" onclick="switchExploit(\'' + e.id + '\')">Activer</button>' : '') +
+        '<button class="btn btn-edit btn-sm" onclick="openExploitModal(\'' + e.id + '\')">Modifier</button>' +
+        '<button class="btn btn-danger btn-sm" onclick="delExploit(\'' + e.id + '\',\'' + e.nom + '\')">Supprimer</button>' +
+      '</div>' +
+    '</div>'
+  ).join('');
+}
+
+// ── MODAL ────────────────────────────────────────────────────
+function openModal(title, body, saveFn) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = body;
+  const btn = document.getElementById('modal-save-btn');
+  btn.onclick = saveFn;
+  btn.style.display = saveFn ? '' : 'none';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+window.closeModal = function() {
+  document.getElementById('modal-overlay').classList.remove('open');
+};
+
+// ── PASSAGE ──────────────────────────────────────────────────
+window.openPassageModal = function(pid) {
+  const p = pid ? S.passages.find(x => x.id === pid) : null;
+  const catNames = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(pr=>pr.cat)])];
+  const parOpts = S.parcelles.map(pa =>
+    '<option value="' + pa.nom + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' selected' : '') + '>' + pa.nom + '</option>'
+  ).join('');
+
+  const prodsHTML = catNames.map(cat => {
+    const catProds = S.produits.filter(pr => pr.cat === cat);
+    if (!catProds.length) return '';
+    const existing = p ? (p.produitsList||[]).filter(pr => pr.cat === cat) : [];
+    const ckey = 'pl' + cat.replace(/[^a-z0-9]/gi,'');
+    return '<div style="margin-bottom:12px;">' +
+      '<div class="prod-cat-title">' + cat + '</div>' +
+      '<div id="' + ckey + '">' + existing.map(pr => prodLineHTML(cat, pr, catProds)).join('') + '</div>' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="addProdLine(\'' + cat + '\',\'' + ckey + '\')">+ ' + cat + '</button>' +
+    '</div>';
+  }).join('');
+
+  const body =
+    '<div class="form-grid" style="margin-bottom:12px;">' +
+      '<div class="form-group"><label>Passage N</label><input type="number" id="f-num" value="' + (p ? p.num : cpPassages().length+1) + '" min="1"></div>' +
+      '<div class="form-group"><label>Campagne</label><input type="text" id="f-camp" value="' + (p ? yearOf(p) : S.campagne) + '"></div>' +
+      '<div class="form-group"><label>Date (JJ/MM/AA)</label><input type="text" id="f-date" value="' + (p ? fmtDate(p.date) : '') + '" placeholder="JJ/MM/AA"></div>' +
+      '<div class="form-group"><label>DRE max (h)</label><input type="number" id="f-dre" value="' + (p ? p.dre||48 : 48) + '"></div>' +
+      '<div class="form-group"><label>Heure debut (HH:MM)</label><input type="time" id="f-hdeb" value="' + (p ? p.heureDebut||'' : '') + '"></div>' +
+      '<div class="form-group"><label>Heure fin (HH:MM)</label><input type="time" id="f-hfin" value="' + (p ? p.heureFin||'' : '') + '"></div>' +
+    '</div>' +
+    '<div class="form-group" style="margin-bottom:12px;">' +
+      '<label>Stade phenologique</label>' +
+      '<select id="f-stade"><option value="">-- Choisir --</option>' + STADES.map(s => '<option value="' + s + '"' + (p&&p.stade===s?' selected':'') + '>' + s + '</option>').join('') + '</select>' +
+    '</div>' +
+    '<div class="form-group" style="margin-bottom:12px;">' +
+      '<label>Parcelles traitees (Ctrl+clic pour multiple)</label>' +
+      '<select id="f-parc" multiple size="4">' + parOpts + '</select>' +
+    '</div>' +
+    '<div class="section-title">Produits appliques</div>' +
+    prodsHTML +
+    '<div class="form-grid" style="margin-top:12px;">' +
+      '<div class="form-group"><label>IFT du passage</label><input type="number" id="f-ift" step="0.01" value="' + (p?p.ift||'':'') + '" placeholder="2.16"></div>' +
+      '<div class="form-group"><label>Cuivre (g/ha)</label><input type="number" id="f-cuivre" value="' + (p?p.cuivre||'':'') + '"></div>' +
+      '<div class="form-group"><label>Folpel (g/ha)</label><input type="number" id="f-folpel" value="' + (p?p.folpel||'':'') + '"></div>' +
+      '<div class="form-group"><label>Phosphonate (g/ha)</label><input type="number" id="f-phos" value="' + (p?p.phosphonate||'':'') + '"></div>' +
+    '</div>' +
+    '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="f-notes" rows="2" placeholder="Conditions meteo...">' + (p?p.notes||'':'') + '</textarea></div>';
+
+  openModal(p ? 'Modifier le passage' : 'Nouveau passage', body, () => savePassage(pid));
+};
+
+function prodLineHTML(cat, existing, catProds) {
+  const opts = catProds.map(p =>
+    '<option value="' + p.nom + '" data-dose="' + (p.dose||'') + '" data-dre="' + (p.dre||0) + '"' + (existing&&existing.nom===p.nom?' selected':'') + '>' + p.nom + '</option>'
+  ).join('');
+  return '<div class="prod-form-row" data-cat="' + cat + '">' +
+    '<select style="flex:2;" onchange="autoFillDose(this)" class="psel"><option value="">-- Produit --</option>' + opts + '</select>' +
+    '<input type="text" placeholder="Dose" style="flex:1;min-width:70px;" class="pdose" value="' + (existing?existing.dose||'':'') + '">' +
+    '<button type="button" class="btn btn-danger btn-icon" onclick="this.closest(\'.prod-form-row\').remove()">x</button>' +
+  '</div>';
+}
+
+window.addProdLine = function(cat, ckey) {
+  const catProds = S.produits.filter(p => p.cat === cat);
+  const container = document.getElementById(ckey);
+  if (!container) return;
+  const div = document.createElement('div');
+  div.innerHTML = prodLineHTML(cat, null, catProds);
+  container.appendChild(div.firstElementChild);
+};
+
+window.autoFillDose = function(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.dose) sel.nextElementSibling.value = opt.dataset.dose;
+};
+
+async function savePassage(pid) {
+  const dateRaw = document.getElementById('f-date').value.trim();
+  if (!dateRaw) { toast('Veuillez indiquer une date', true); return; }
+  const parc = Array.from(document.getElementById('f-parc').selectedOptions).map(o=>o.value);
+  const prodsList = [];
+  document.querySelectorAll('.prod-form-row[data-cat]').forEach(row => {
+    const sel = row.querySelector('.psel');
+    const dose = row.querySelector('.pdose');
+    if (sel && sel.value) {
+      const cat = row.dataset.cat;
+      const base = S.produits.find(p => p.nom === sel.value && p.cat === cat);
+      prodsList.push({nom:sel.value, cat, dose:dose?dose.value:'', dre:base?base.dre:0, amm:base?base.amm||'':''});
+    }
+  });
+  const data = {
+    num: parseInt(document.getElementById('f-num').value)||1,
+    campagne: document.getElementById('f-camp').value || S.campagne,
+    date: dateRaw,
+    heureDebut: document.getElementById('f-hdeb').value,
+    heureFin: document.getElementById('f-hfin').value,
+    stade: document.getElementById('f-stade').value,
+    dre: document.getElementById('f-dre').value,
+    parcelles: parc,
+    produitsList: prodsList,
+    ift: parseFloat(document.getElementById('f-ift').value)||0,
+    cuivre: parseFloat(document.getElementById('f-cuivre').value)||0,
+    folpel: parseFloat(document.getElementById('f-folpel').value)||0,
+    phosphonate: parseFloat(document.getElementById('f-phos').value)||0,
+    notes: document.getElementById('f-notes').value,
+    updatedAt: serverTimestamp()
+  };
+  try {
+    const eid = S.currentId;
+    if (pid) await updateDoc(subdoc(eid,'passages',pid), data);
+    else { data.createdAt = serverTimestamp(); await addDoc(sub(eid,'passages'), data); }
+    closeModal(); toast('Passage enregistre');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+window.delPassage = function(id) {
+  confirm2('Supprimer ce passage ?', 'Cette action est irreversible.', async () => {
+    await deleteDoc(subdoc(S.currentId,'passages',id));
+    toast('Passage supprime');
+  });
+};
+
+// ── PRODUIT ──────────────────────────────────────────────────
+window.openProduitModal = function(pid, defCat) {
+  const p = pid ? S.produits.find(x => x.id === pid) : null;
+  const catNames = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(pr=>pr.cat)])].sort();
+  const body =
+    '<div class="form-grid">' +
+      '<div class="form-group full"><label>Nom commercial</label><input type="text" id="fp-nom" value="' + (p?p.nom:'') + '" placeholder="HELIOCUIVRE" style="text-transform:uppercase;"></div>' +
+      '<div class="form-group"><label>Categorie</label><select id="fp-cat">' +
+        catNames.map(c => '<option value="' + c + '"' + ((p&&p.cat===c)||(defCat===c)?' selected':'') + '>' + c + '</option>').join('') +
+      '</select></div>' +
+      '<div class="form-group"><label>N AMM</label><input type="text" id="fp-amm" value="' + (p?p.amm||'':'') + '" placeholder="7 chiffres"></div>' +
+      '<div class="form-group"><label>Dose habituelle</label><input type="text" id="fp-dose" value="' + (p?p.dose||'':'') + '" placeholder="2L/HA"></div>' +
+      '<div class="form-group"><label>DRE (heures)</label><input type="number" id="fp-dre" value="' + (p?p.dre||0:0) + '"></div>' +
+    '</div>';
+  openModal(p ? 'Modifier le produit' : 'Nouveau produit', body, () => saveProduit(pid));
+};
+
+async function saveProduit(pid) {
+  const nom = document.getElementById('fp-nom').value.toUpperCase().trim();
+  if (!nom) { toast('Nom requis', true); return; }
+  const data = {nom, cat:document.getElementById('fp-cat').value, amm:document.getElementById('fp-amm').value, dose:document.getElementById('fp-dose').value, dre:parseInt(document.getElementById('fp-dre').value)||0};
+  try {
+    const eid = S.currentId;
+    if (pid) await updateDoc(subdoc(eid,'produits',pid), data);
+    else await addDoc(sub(eid,'produits'), data);
+    closeModal(); toast('Produit enregistre');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+window.delProduit = function(id, nom) {
+  confirm2('Supprimer "' + nom + '" ?', 'Ce produit sera retire de la base. Les passages existants ne seront pas modifies.', async () => {
+    await deleteDoc(subdoc(S.currentId,'produits',id));
+    toast('Produit supprime');
+  });
+};
+
+// ── CATEGORIE ────────────────────────────────────────────────
+window.openCatModal = function() {
+  openModal('Nouvelle categorie', '<div class="form-group"><label>Nom</label><input type="text" id="fc-nom" placeholder="ex: Herbicides"></div>', saveCat);
+};
+async function saveCat() {
+  const nom = document.getElementById('fc-nom').value.trim();
+  if (!nom) { toast('Nom requis', true); return; }
+  await addDoc(sub(S.currentId,'categories'), {nom});
+  closeModal(); toast('Categorie ajoutee');
+}
+window.delCat = function(id, nom) {
+  const n = S.produits.filter(p => p.cat === nom).length;
+  confirm2('Supprimer la categorie "' + nom + '" ?', n + ' produit(s) dans cette categorie ne seront pas supprimes.', async () => {
+    await deleteDoc(subdoc(S.currentId,'categories',id));
+    toast('Categorie supprimee');
+  });
+};
+
+// ── PARCELLE ─────────────────────────────────────────────────
+window.openParcelleModal = function(pid) {
+  const p = pid ? S.parcelles.find(x => x.id === pid) : null;
+  const body =
+    '<div class="form-grid">' +
+      '<div class="form-group full"><label>Nom de la parcelle</label><input type="text" id="fpar-nom" value="' + (p?p.nom:'') + '" placeholder="LES PARADIS" style="text-transform:uppercase;"></div>' +
+      '<div class="form-group"><label>Surface (ha)</label><input type="number" id="fpar-surf" step="0.01" value="' + (p?p.surface||'':'') + '" placeholder="0.00"></div>' +
+      '<div class="form-group"><label>N Ilot RPG</label><input type="text" id="fpar-ilot" value="' + (p?p.ilot||'':'') + '"></div>' +
+      '<div class="form-group"><label>Code commune INSEE</label><input type="text" id="fpar-com" value="' + (p?p.commune||'':'') + '"></div>' +
+      '<div class="form-group full"><label>Coordonnees GPS</label><input type="text" id="fpar-gps" value="' + (p?p.gps||'':'') + '" placeholder="48.123, 3.456"></div>' +
+    '</div>';
+  openModal(p ? 'Modifier la parcelle' : 'Nouvelle parcelle', body, () => saveParcelle(pid));
+};
+
+async function saveParcelle(pid) {
+  const nom = document.getElementById('fpar-nom').value.toUpperCase().trim();
+  if (!nom) { toast('Nom requis', true); return; }
+  const data = {nom, surface:parseFloat(document.getElementById('fpar-surf').value)||0, ilot:document.getElementById('fpar-ilot').value, commune:document.getElementById('fpar-com').value, gps:document.getElementById('fpar-gps').value};
+  try {
+    const eid = S.currentId;
+    if (pid) await updateDoc(subdoc(eid,'parcelles',pid), data);
+    else await addDoc(sub(eid,'parcelles'), data);
+    closeModal(); toast('Parcelle enregistree');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+window.delParcelle = function(id, nom) {
+  confirm2('Supprimer "' + nom + '" ?', 'Les passages existants ne seront pas modifies.', async () => {
+    await deleteDoc(subdoc(S.currentId,'parcelles',id));
+    toast('Parcelle supprimee');
+  });
+};
+
+// ── EXPLOITATION ─────────────────────────────────────────────
+window.openExploitModal = function(eid) {
+  const e = eid ? S.exploitations.find(x => x.id === eid) : null;
+  const body =
+    '<div class="form-grid">' +
+      '<div class="form-group full"><label>Raison sociale / Nom</label><input type="text" id="fe-nom" value="' + (e?e.nom:'') + '" placeholder="EI DUPONT Jean"></div>' +
+      '<div class="form-group"><label>N SIRET (14 chiffres)</label><input type="text" id="fe-siret" maxlength="14" value="' + (e?e.siret||'':'') + '"></div>' +
+      '<div class="form-group"><label>N Certiphyto</label><input type="text" id="fe-cert" value="' + (e?e.certiphyto||'':'') + '"></div>' +
+      '<div class="form-group"><label>Surface totale (ha)</label><input type="number" id="fe-surf" step="0.01" value="' + (e?e.surface||'':'') + '"></div>' +
+      '<div class="form-group"><label>Agriculture Biologique</label><select id="fe-ab"><option value="false"' + (e&&!e.ab?' selected':'') + '>Non</option><option value="true"' + (e&&e.ab?' selected':'') + '>Oui</option></select></div>' +
+    '</div>';
+  openModal(e ? 'Modifier l exploitation' : 'Nouvelle exploitation', body, () => saveExploit(eid));
+};
+
+async function saveExploit(eid) {
+  const nom = document.getElementById('fe-nom').value.trim();
+  if (!nom) { toast('Nom requis', true); return; }
+  const data = {nom, siret:document.getElementById('fe-siret').value, certiphyto:document.getElementById('fe-cert').value, surface:parseFloat(document.getElementById('fe-surf').value)||0, ab:document.getElementById('fe-ab').value==='true'};
+  try {
+    if (eid) {
+      await updateDoc(exploitDoc(eid), data);
+    } else {
+      data.createdAt = serverTimestamp();
+      const ref = await addDoc(exploitsCol(), data);
+      S.currentId = ref.id;
+      for (const c of DEF_CATS) await addDoc(sub(ref.id,'categories'), {nom:c});
+      listenExploit();
+    }
+    closeModal(); toast('Exploitation enregistree');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+window.switchExploit = function(id) {
+  S.currentId = id;
+  loading(true);
+  listenExploit();
+  setTimeout(() => loading(false), 800);
+  toast('Exploitation activee');
+};
+
+window.delExploit = function(id, nom) {
+  if (S.exploitations.length <= 1) { toast('Impossible de supprimer la derniere exploitation', true); return; }
+  confirm2('Supprimer "' + nom + '" ?', 'Attention : les donnees (passages, produits, parcelles) restent dans Firebase mais l exploitation sera retiree de la liste.', async () => {
+    await deleteDoc(exploitDoc(id));
+    if (S.currentId === id) {
+      const other = S.exploitations.find(e => e.id !== id);
+      if (other) { S.currentId = other.id; listenExploit(); }
+    }
+    toast('Exploitation supprimee');
+  });
+};
+
+// ── EXPORT ───────────────────────────────────────────────────
+window.exportExcel = function() {
+  const ex = getEx();
+  const campagne = document.getElementById('export-campagne').value || S.campagne;
+  const passages = cpPassages().sort((a,b) => toISO(a.date)<toISO(b.date)?-1:1);
+  const rows = [];
+  rows.push(['Fiche enregistrement phytosanitaires']);
+  rows.push(['Identification','','','',ex.nom,'','Date de recolte:', document.getElementById('export-recolte').value||'']);
+  rows.push(['Nbr. de passage','','','', ...passages.map((_,i) => [i+1,'','']).flat()]);
+  rows.push(['Date de passage','','','', ...passages.map(p => [fmtDate(p.date),'','']).flat()]);
+  rows.push(['DRE','','','', ...passages.map(p => [p.dre||48,'','']).flat()]);
+  rows.push([]);
+  const catNames = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(p=>p.cat)])];
+  catNames.forEach(cat => {
+    const noms=[], doses=[];
+    passages.forEach(p => {
+      const pp = (p.produitsList||[]).filter(pr=>pr.cat===cat);
+      noms.push(pp.map(pr=>pr.nom).join(' + ')||'','','');
+      doses.push(pp.map(pr=>pr.dose).join(' / ')||'','','');
+    });
+    rows.push([cat,'','','Nom',...noms]);
+    rows.push(['','','','Qte',...doses]);
+    rows.push([]);
+  });
+  rows.push(['IFT','','','', ...passages.map(p=>[p.ift||0,'','']).flat()]);
+  rows.push(['Cuivre (g/ha)','','','', ...passages.map(p=>[p.cuivre||0,'','']).flat()]);
+  rows.push(['Folpel (g/ha)','','','', ...passages.map(p=>[p.folpel||0,'','']).flat()]);
+  rows.push(['Phosphonate (g/ha)','','','', ...passages.map(p=>[p.phosphonate||0,'','']).flat()]);
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:22},{wch:8},{wch:8},{wch:14},...Array(Math.max(passages.length,1)*3).fill({wch:14})];
+  XLSX.utils.book_append_sheet(wb, ws, 'Traitements ' + campagne);
+  const wsP = XLSX.utils.aoa_to_sheet([['Parcelle','Surface (ha)','Ilot','Commune','GPS'],...S.parcelles.map(p=>[p.nom,p.surface,p.ilot,p.commune,p.gps||''])]);
+  XLSX.utils.book_append_sheet(wb, wsP, 'Parcelles');
+  XLSX.writeFile(wb, 'Registre_phyto_' + ex.nom.replace(/\s/g,'_') + '_' + campagne + '.xlsx');
+  toast('Export Excel telecharge');
+};
+
+window.exportCSV = function() {
+  const ex = getEx();
+  const header = ['N Ilot','N Parcelle','Code commune','GPS','Culture','Label AB','Nom produit','N AMM','Date','Dose','Surface','Mode','H debut','H fin','Cible','DRE','Stade','Applicateur','SIRET'];
+  const rows = [header];
+  cpPassages().forEach(p => {
+    (p.produitsList||[]).forEach(pr => {
+      (p.parcelles||['']).forEach(parc => {
+        const pi = S.parcelles.find(pa=>pa.nom===parc)||{};
+        rows.push([pi.ilot||'',parc,pi.commune||'',pi.gps||'','Vigne',ex.ab?'Oui':'Non',pr.nom,pr.amm||'',fmtDate(p.date),pr.dose||'',pi.surface||'','Plein air',p.heureDebut||'',p.heureFin||'',pr.cat,pr.dre||'',p.stade||'',ex.nom,ex.siret||'']);
+      });
+    });
+  });
+  const csv = rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'Registre_reglementaire_' + ex.nom.replace(/\s/g,'_') + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+  toast('CSV reglementaire telecharge');
+};
+
+// ── DEMARRAGE ────────────────────────────────────────────────
+init();
+
+</script>
+</body>
+</html>
