@@ -101,6 +101,13 @@ tr:hover td{background:var(--vert-xxl);}
 .produits-cat-name{font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.5px;}
 
 .parcelle-list{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);overflow:hidden;}
+.parcelle-section-title{text-align:center;padding:16px 20px 14px;border-bottom:2px solid var(--vert-xl);}
+.parcelle-section-title .pst-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--gris);opacity:.5;margin-bottom:6px;}
+.parcelle-section-title .pst-stats{display:flex;align-items:center;justify-content:center;gap:0;}
+.parcelle-section-title .pst-stat{padding:0 18px;text-align:center;}
+.parcelle-section-title .pst-stat-val{font-size:22px;font-weight:300;color:var(--vert);line-height:1.1;}
+.parcelle-section-title .pst-stat-lbl{font-size:11px;color:var(--gris);opacity:.6;margin-top:2px;}
+.parcelle-section-title .pst-sep{width:1px;height:32px;background:var(--gris-m);opacity:.5;}
 .parcelle-item{display:flex;align-items:center;justify-content:space-between;padding:16px 16px;border-bottom:1px solid var(--gris-l);gap:12px;}
 .parcelle-item:last-child{border-bottom:none;}
 .parcelle-left{flex:1;min-width:0;}
@@ -730,7 +737,14 @@ function renderParcelles() {
   }
   const total = S.parcelles.reduce((s,p) => s + (parseFloat(p.surface)||0), 0);
   el.innerHTML =
-    '<div class="parcelle-section-title">PARCELLES ENREGISTREES &nbsp;&middot;&nbsp; ' + S.parcelles.length + ' parcelles &nbsp;&middot;&nbsp; ' + total.toFixed(2) + ' ha</div>' +
+    '<div class="parcelle-section-title">' +
+      '<div class="pst-label">Parcelles enregistrees</div>' +
+      '<div class="pst-stats">' +
+        '<div class="pst-stat"><div class="pst-stat-val">' + S.parcelles.length + '</div><div class="pst-stat-lbl">parcelles</div></div>' +
+        '<div class="pst-sep"></div>' +
+        '<div class="pst-stat"><div class="pst-stat-val">' + total.toFixed(2) + '</div><div class="pst-stat-lbl">hectares</div></div>' +
+      '</div>' +
+    '</div>' +
     S.parcelles.map(p => {
       const infos = [];
       if (p.surface) infos.push(p.surface + ' ha');
