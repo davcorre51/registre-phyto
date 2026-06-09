@@ -156,8 +156,16 @@ tr:hover td{background:var(--vert-xxl);}
 .campagne-bar label{font-size:12px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.5px;}
 .campagne-bar select{border:1px solid var(--gris-m);border-radius:var(--r-sm);padding:6px 10px;font-size:13px;color:var(--vert);font-weight:600;background:var(--blanc);}
 
-.prod-form-row{display:flex;gap:6px;align-items:center;margin-bottom:6px;padding:6px;background:var(--gris-l);border-radius:var(--r-sm);}
-.prod-form-row select,.prod-form-row input{font-size:12px;}
+.prod-pills-section{margin-bottom:14px;}
+.prod-pills-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--vert);margin-bottom:8px;}
+.prod-pills-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.prod-pill{display:flex;align-items:center;gap:0;border-radius:50px;border:1.5px solid var(--gris-m);background:var(--blanc);overflow:hidden;transition:all .15s;cursor:pointer;}
+.prod-pill.active{border-color:var(--vert-l);background:var(--vert-xxl);}
+.prod-pill-name{padding:8px 14px;font-size:13px;font-weight:500;color:var(--gris);user-select:none;}
+.prod-pill.active .prod-pill-name{color:var(--vert);font-weight:600;}
+.prod-pill-dose{display:none;padding:6px 10px;background:var(--vert-xl);border-left:1.5px solid var(--vert-l);}
+.prod-pill.active .prod-pill-dose{display:block;}
+.prod-pill-dose input{border:none;background:transparent;font-size:12px;color:var(--vert);font-weight:600;width:80px;outline:none;font-family:inherit;}
 
 .stades-row{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;scrollbar-width:none;}
 .stade-pill{background:var(--vert-xxl);border:1px solid var(--vert-xl);border-radius:20px;padding:3px 10px;font-size:11px;white-space:nowrap;color:var(--vert);font-weight:500;cursor:pointer;}
@@ -513,7 +521,11 @@ function updateCampagneSelector() {
   const years = [...new Set(S.passages.map(p => yearOf(p)))].sort().reverse();
   const cur = String(new Date().getFullYear());
   if (!years.includes(cur)) years.unshift(cur);
-  if (!years.includes(S.campagne)) S.campagne = years[0] || cur;
+  // Ne pas ecraser S.campagne si elle est deja definie (meme sans passages)
+  if (!S.campagne) S.campagne = years[0] || cur;
+  // Ajouter S.campagne a la liste si absente (nouvelle campagne vide)
+  if (!years.includes(S.campagne)) years.unshift(S.campagne);
+  years.sort().reverse();
   const sel = document.getElementById('campagne-select');
   sel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === S.campagne ? ' selected' : '') + '>' + y + '</option>').join('');
 }
@@ -522,8 +534,12 @@ window.onCampagneChange = function() {
   render();
 };
 window.newCampagne = function() {
-  const y = prompt('Annee de la nouvelle campagne :', String(new Date().getFullYear() + 1));
-  if (y && /^\d{4}$/.test(y)) { S.campagne = y; updateCampagneSelector(); render(); }
+  const y = prompt('Annee de la campagne :', '');
+  if (!y || !/^\d{4}$/.test(y.trim())) { if(y !== null) toast('Annee invalide (ex: 2025)', true); return; }
+  S.campagne = y.trim();
+  updateCampagneSelector();
+  render();
+  toast('Campagne ' + S.campagne + ' selectionnee');
 };
 
 // ── NAV ──────────────────────────────────────────────────────
@@ -604,6 +620,15 @@ function renderPassages(cp) {
     '</div>';
   }).join('');
 }
+
+window.togglePill = function(pill) {
+  pill.classList.toggle('active');
+  if (pill.classList.contains('active')) {
+    const dose = pill.querySelector('.pill-dose');
+    const base = S.produits.find(p => p.nom === pill.dataset.nom && p.cat === pill.dataset.cat);
+    if (dose && base && !dose.value) dose.value = base.dose || '';
+  }
+};
 
 window.selectAllParcelles = function(checked) {
   document.querySelectorAll('.parc-cb').forEach(cb => cb.checked = checked);
@@ -734,12 +759,18 @@ window.openPassageModal = function(pid) {
     const catProds = S.produits.filter(pr => pr.cat === cat);
     if (!catProds.length) return '';
     const existing = p ? (p.produitsList||[]).filter(pr => pr.cat === cat) : [];
-    const ckey = 'pl' + cat.replace(/[^a-z0-9]/gi,'');
-    return '<div style="margin-bottom:12px;">' +
-      '<div class="prod-cat-title">' + cat + '</div>' +
-      '<div id="' + ckey + '">' + existing.map(pr => prodLineHTML(cat, pr, catProds)).join('') + '</div>' +
-      '<button type="button" class="btn btn-secondary btn-sm" onclick="addProdLine(\'' + cat + '\',\'' + ckey + '\')">+ ' + cat + '</button>' +
-    '</div>';
+    return '<div class="prod-pills-section">' +
+      '<div class="prod-pills-title">' + cat + '</div>' +
+      '<div class="prod-pills-grid">' +
+      catProds.map(pr => {
+        const sel = existing.find(e => e.nom === pr.nom);
+        const isActive = !!sel;
+        return '<div class="prod-pill' + (isActive ? ' active' : '') + '" data-cat="' + cat + '" data-nom="' + pr.nom + '" data-dre="' + (pr.dre||0) + '" data-amm="' + (pr.amm||'') + '" onclick="togglePill(this)">' +
+          '<div class="prod-pill-name">' + pr.nom + '</div>' +
+          '<div class="prod-pill-dose"><input type="text" class="pill-dose" value="' + (sel ? sel.dose||'' : pr.dose||'') + '" placeholder="dose" onclick="event.stopPropagation()"></div>' +
+        '</div>';
+      }).join('') +
+      '</div></div>';
   }).join('');
 
   const body =
@@ -810,14 +841,12 @@ async function savePassage(pid) {
   const dateRaw = fmtDate(dateISO);
   const parc = Array.from(document.querySelectorAll('.parc-cb:checked')).map(cb=>cb.value);
   const prodsList = [];
-  document.querySelectorAll('.prod-form-row[data-cat]').forEach(row => {
-    const sel = row.querySelector('.psel');
-    const dose = row.querySelector('.pdose');
-    if (sel && sel.value) {
-      const cat = row.dataset.cat;
-      const base = S.produits.find(p => p.nom === sel.value && p.cat === cat);
-      prodsList.push({nom:sel.value, cat, dose:dose?dose.value:'', dre:base?base.dre:0, amm:base?base.amm||'':''});
-    }
+  document.querySelectorAll('.prod-pill.active').forEach(pill => {
+    const nom = pill.dataset.nom;
+    const cat = pill.dataset.cat;
+    const dose = pill.querySelector('.pill-dose');
+    const base = S.produits.find(p => p.nom === nom && p.cat === cat);
+    prodsList.push({nom, cat, dose: dose ? dose.value : (base ? base.dose||'' : ''), dre: base ? base.dre : 0, amm: base ? base.amm||'' : ''});
   });
   const data = {
     num: parseInt(document.getElementById('f-num').value)||1,
