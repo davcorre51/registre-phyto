@@ -582,7 +582,7 @@ function renderDash(cp) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🌿</div><div class="empty-text">Aucun passage pour cette campagne</div></div>';
     return;
   }
-  const last5 = [...cp].reverse().slice(0,5);
+  const last5 = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).slice(0,5);
   el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>N</th><th>Date</th><th>Stade</th><th>Produits</th><th>IFT</th></tr></thead><tbody>' +
     last5.map(p => '<tr><td><span class="badge badge-vert">' + (p.num||'-') + '</span></td><td>' + fmtDate(p.date) + '</td><td style="font-size:11px;max-width:110px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + (p.stade||'-') + '</td><td style="font-size:11px;">' + (p.produitsList||[]).slice(0,2).map(pr=>pr.nom).join(', ') + ((p.produitsList||[]).length>2?'...':'') + '</td><td><span class="badge badge-ocre">' + (parseFloat(p.ift)||0).toFixed(2) + '</span></td></tr>').join('') +
     '</tbody></table></div>';
@@ -594,7 +594,7 @@ function renderPassages(cp) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Aucun passage - cliquez sur + Ajouter</div></div>';
     return;
   }
-  el.innerHTML = [...cp].reverse().map(p => {
+  el.innerHTML = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).map(p => {
     const prods = p.produitsList || [];
     const byCat = {};
     prods.forEach(pr => { if (!byCat[pr.cat]) byCat[pr.cat] = []; byCat[pr.cat].push(pr); });
@@ -609,7 +609,7 @@ function renderPassages(cp) {
         '<div><div class="passage-date">' + fmtDate(p.date) + (p.heureDebut ? ' — ' + p.heureDebut : '') + '</div>' +
         '<div class="passage-meta">' + ((p.parcelles||[]).join(', ')||'Toutes parcelles') + '</div></div>' +
         '<div class="passage-right"><div style="font-size:11px;color:var(--gris);text-align:right;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.stade||'') + '</div>' +
-        '<div style="display:flex;gap:4px;"><span class="badge badge-ocre">IFT ' + (parseFloat(p.ift)||0).toFixed(2) + '</span>' + (p.dre ? '<span class="badge badge-rouge">DRE ' + p.dre + 'h</span>' : '') + '</div></div>' +
+        '<div style="display:flex;gap:4px;"><span class="badge badge-ocre">IFT ' + (parseFloat(p.ift)||0).toFixed(2) + '</span>' + (function(){ var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre)||0);},0); return m?'<span class="badge badge-rouge">DRE '+m+'h</span>':''; })() + '</div></div>' +
       '</div>' +
       '<div class="passage-body" id="pb' + p.id + '">' + (bodyHTML || '<span style="font-size:12px;color:var(--gris);">Aucun produit saisi.</span>') +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
@@ -628,7 +628,19 @@ window.togglePill = function(pill) {
     const base = S.produits.find(p => p.nom === pill.dataset.nom && p.cat === pill.dataset.cat);
     if (dose && base && !dose.value) dose.value = base.dose || '';
   }
+  recalcDRE();
 };
+
+function recalcDRE() {
+  const actives = document.querySelectorAll('.prod-pill.active');
+  let maxDre = 0;
+  actives.forEach(pill => {
+    const dre = parseInt(pill.dataset.dre) || 0;
+    if (dre > maxDre) maxDre = dre;
+  });
+  const field = document.getElementById('f-dre');
+  if (field) field.value = maxDre;
+}
 
 window.selectAllParcelles = function(checked) {
   document.querySelectorAll('.parc-cb').forEach(cb => cb.checked = checked);
@@ -778,7 +790,7 @@ window.openPassageModal = function(pid) {
       '<div class="form-group"><label>Passage N</label><input type="number" id="f-num" value="' + (p ? p.num : cpPassages().length+1) + '" min="1"></div>' +
       '<div class="form-group"><label>Campagne</label><input type="text" id="f-camp" value="' + (p ? yearOf(p) : S.campagne) + '"></div>' +
       '<div class="form-group"><label>Date</label><input type="date" id="f-date" value="' + (p ? toISO(p.date) : '') + '"></div>' +
-      '<div class="form-group"><label>DRE max (h)</label><input type="number" id="f-dre" value="' + (p ? p.dre||48 : 48) + '"></div>' +
+      '<div class="form-group"><label>DRE max (h) — auto</label><input type="number" id="f-dre" value="' + (p ? p.dre||0 : 0) + '" readonly style="background:var(--vert-xxl);color:var(--vert);font-weight:600;"></div>' +
       '<div class="form-group"><label>Heure debut (HH:MM)</label><input type="time" id="f-hdeb" value="' + (p ? p.heureDebut||'' : '') + '"></div>' +
       '<div class="form-group"><label>Heure fin (HH:MM)</label><input type="time" id="f-hfin" value="' + (p ? p.heureFin||'' : '') + '"></div>' +
     '</div>' +
