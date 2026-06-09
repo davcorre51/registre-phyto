@@ -204,15 +204,17 @@ tr:hover td{background:var(--vert-xxl);}
   <div class="tab" onclick="showPage('export')">Export</div>
 </div>
 
+<div id="campagne-global-bar" style="background:var(--blanc);border-bottom:1px solid var(--gris-m);padding:8px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:97px;z-index:80;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+  <span style="font-size:11px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.5px;">Campagne</span>
+  <select id="campagne-select" onchange="onCampagneChange()" style="border:1px solid var(--gris-m);border-radius:var(--r-sm);padding:6px 10px;font-size:13px;color:var(--vert);font-weight:700;background:var(--blanc);cursor:pointer;"></select>
+  <button class="btn btn-secondary btn-sm" onclick="newCampagne()">+ Nouvelle</button>
+  <span id="camp-info" style="font-size:12px;color:var(--gris);margin-left:4px;"></span>
+</div>
 <div id="content">
 
   <!-- DASHBOARD -->
   <div id="page-dashboard" class="page active">
-    <div class="campagne-bar">
-      <label>Campagne</label>
-      <select id="campagne-select" onchange="onCampagneChange()"></select>
-      <button class="btn btn-secondary btn-sm" onclick="newCampagne()">+ Nouvelle</button>
-    </div>
+
     <div class="stats-row">
       <div class="stat-card"><div class="stat-label">Passages</div><div class="stat-val" id="stat-passages">0</div><div class="stat-unit">enregistres</div></div>
       <div class="stat-card ocre"><div class="stat-label">IFT Total</div><div class="stat-val" id="stat-ift">0.0</div><div class="stat-unit">indice freq.</div></div>
@@ -271,12 +273,16 @@ tr:hover td{background:var(--vert-xxl);}
       <div class="card-title">Export Excel - Programme previsionnel</div>
       <p style="font-size:13px;color:var(--gris);margin-bottom:14px;line-height:1.6;">Format identique au fichier EI CORRE Christine : passages en colonnes, produits par categorie en lignes, avec DRE et IFT.</p>
       <div class="form-grid" style="margin-bottom:14px;">
-        <div class="form-group"><label>Campagne</label><input type="text" id="export-campagne" value="2026"></div>
+        <div class="form-group">
+          <label>Campagne a exporter</label>
+          <select id="export-campagne" onchange="onExportCampagneChange()" style="border:1px solid var(--gris-m);border-radius:var(--r-sm);padding:8px 10px;font-size:13px;color:var(--vert);font-weight:700;background:var(--blanc);"></select>
+        </div>
         <div class="form-group"><label>Date de recolte</label><input type="date" id="export-recolte"></div>
       </div>
+      <div id="export-resume" style="background:var(--vert-xxl);border-radius:var(--r-sm);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--vert);"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-primary" onclick="exportExcel()">Telecharger Excel</button>
-        <button class="btn btn-secondary" onclick="exportCSV()">CSV reglementaire 2026</button>
+        <button class="btn btn-secondary" onclick="exportCSV()">CSV reglementaire</button>
       </div>
     </div>
     <div class="card">
@@ -527,12 +533,39 @@ function updateCampagneSelector() {
   if (!years.includes(S.campagne)) years.unshift(S.campagne);
   years.sort().reverse();
   const sel = document.getElementById('campagne-select');
-  sel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === S.campagne ? ' selected' : '') + '>' + y + '</option>').join('');
+  if (sel) sel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === S.campagne ? ' selected' : '') + '>' + y + '</option>').join('');
+  // Synchroniser le select export
+  const expSel = document.getElementById('export-campagne');
+  if (expSel) expSel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === S.campagne ? ' selected' : '') + '>' + y + '</option>').join('');
+  updateExportResume();
 }
 window.onCampagneChange = function() {
   S.campagne = document.getElementById('campagne-select').value;
+  // Synchroniser select export
+  const expSel = document.getElementById('export-campagne');
+  if (expSel) expSel.value = S.campagne;
+  updateExportResume();
   render();
 };
+function updateExportResume() {
+  const el = document.getElementById('export-resume');
+  if (!el) return;
+  const expSel = document.getElementById('export-campagne');
+  const year = expSel ? expSel.value : S.campagne;
+  const passages = S.passages.filter(p => yearOf(p) === year);
+  const ift = passages.reduce((s,p) => s+(parseFloat(p.ift)||0), 0);
+  if (!passages.length) {
+    el.textContent = 'Campagne ' + year + ' : aucun passage enregistre.';
+  } else {
+    el.innerHTML = 'Campagne <strong>' + year + '</strong> : <strong>' + passages.length + '</strong> passage(s) &nbsp;·&nbsp; IFT total <strong>' + ift.toFixed(2) + '</strong>';
+  }
+}
+
+// Quand on change le select export directement
+window.onExportCampagneChange = function() {
+  updateExportResume();
+};
+
 window.newCampagne = function() {
   const y = prompt('Annee de la campagne :', '');
   if (!y || !/^\d{4}$/.test(y.trim())) { if(y !== null) toast('Annee invalide (ex: 2025)', true); return; }
@@ -569,6 +602,7 @@ function render() {
   document.getElementById('stat-passages').textContent = cp.length;
   document.getElementById('stat-ift').textContent = ift.toFixed(2);
   document.getElementById('stat-parcelles').textContent = S.parcelles.length;
+  updateExportResume();
   renderDash(cp);
   renderPassages(cp);
   renderProduits();
@@ -1030,8 +1064,9 @@ window.delExploit = function(id, nom) {
 // ── EXPORT ───────────────────────────────────────────────────
 window.exportExcel = function() {
   const ex = getEx();
-  const campagne = document.getElementById('export-campagne').value || S.campagne;
-  const passages = cpPassages().sort((a,b) => toISO(a.date)<toISO(b.date)?-1:1);
+  const expSel = document.getElementById('export-campagne');
+  const campagne = (expSel ? expSel.value : null) || S.campagne;
+  const passages = S.passages.filter(p => yearOf(p) === campagne).sort((a,b) => toISO(a.date)<toISO(b.date)?-1:1);
   const rows = [];
   rows.push(['Fiche enregistrement phytosanitaires']);
   rows.push(['Identification','','','',ex.nom,'','Date de recolte:', document.getElementById('export-recolte').value||'']);
@@ -1066,7 +1101,9 @@ window.exportCSV = function() {
   const ex = getEx();
   const header = ['N Ilot','N Parcelle','Code commune','GPS','Culture','Label AB','Nom produit','N AMM','Date','Dose','Surface','Mode','H debut','H fin','Cible','DRE','Stade','Applicateur','SIRET'];
   const rows = [header];
-  cpPassages().forEach(p => {
+  const expSelCSV = document.getElementById('export-campagne');
+  const campagneCSV = (expSelCSV ? expSelCSV.value : null) || S.campagne;
+  S.passages.filter(p => yearOf(p) === campagneCSV).forEach(p => {
     (p.produitsList||[]).forEach(pr => {
       (p.parcelles||['']).forEach(parc => {
         const pi = S.parcelles.find(pa=>pa.nom===parc)||{};
