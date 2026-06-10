@@ -677,9 +677,9 @@ function renderDash(cp) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🌿</div><div class="empty-text">Aucun passage pour cette campagne</div></div>';
     return;
   }
-  const last5 = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).slice(0,5);
+  const lastN = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).slice(0,15);
   el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>N</th><th>Date</th><th>Stade</th><th>Produits</th><th>IFT</th></tr></thead><tbody>' +
-    last5.map(p => '<tr><td><span class="badge badge-vert">' + (p.num||'-') + '</span></td><td>' + fmtDate(p.date) + '</td><td style="font-size:11px;max-width:110px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + (p.stade||'-') + '</td><td style="font-size:11px;">' + (p.produitsList||[]).slice(0,2).map(pr=>pr.nom).join(', ') + ((p.produitsList||[]).length>2?'...':'') + '</td><td><span class="badge badge-ocre">' + (parseFloat(p.ift)||0).toFixed(2) + '</span></td></tr>').join('') +
+    lastN.map(p => '<tr><td><span class="badge badge-vert">' + (p.num||'-') + '</span></td><td>' + fmtDate(p.date) + '</td><td style="font-size:11px;max-width:110px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + (p.stade||'-') + '</td><td style="font-size:11px;">' + (p.produitsList||[]).slice(0,2).map(pr=>pr.nom).join(', ') + ((p.produitsList||[]).length>2?'...':'') + '</td><td><span class="badge badge-ocre">' + (parseFloat(p.ift)||0).toFixed(2) + '</span></td></tr>').join('') +
     '</tbody></table></div>';
 }
 
