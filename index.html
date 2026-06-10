@@ -352,13 +352,31 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
 // ── CONSTANTES ──────────────────────────────────────────────
-const STADES = [
+const STADES_VITICOLE = [
   'Bourgeon dans le coton','Feuilles etalees','Grappes visibles',
   'Grappes separees','Boutons floraux separes','Debut fleur',
   'Pleine fleur','Nouaison','Grain de pois',
   'Debut fermeture grappe','Fin fermeture grappe'
 ];
-const DEF_CATS = ['Mildiou','Oidium','Biocontrole / SDN','Adjuvants','Botrytis','Nutrition foliaire','Insecticides'];
+
+const CULTURES_AGRICOLE = [
+  'Ble tendre','Orge','Colza','Tournesol','Mais'
+];
+
+const STADES_AGRICOLE = {
+  'Ble tendre': ['Semis','Levee','Tallage','Montaison','Epi 1 cm','Gonflement','Epiaison','Floraison','Grain laiteux','Grain pateux','Maturite'],
+  'Orge':       ['Semis','Levee','Tallage','Montaison','Epi 1 cm','Gonflement','Epiaison','Floraison','Grain laiteux','Grain pateux','Maturite'],
+  'Colza':      ['Semis','Levee','Rosette','Montaison','Bouton floral','Debut floraison','Pleine floraison','Fin floraison','Siliques vertes','Maturite'],
+  'Tournesol':  ['Semis','Levee','4 feuilles','6 feuilles','8 feuilles','Bouton floral','Debut floraison','Pleine floraison','Fin floraison','Maturite'],
+  'Mais':       ['Semis','Levee','3 feuilles','6 feuilles','10 feuilles','Montaison','Floraison male','Floraison femelle','Grain laiteux','Maturite']
+};
+
+function getStades(exploit, culture) {
+  if (!exploit || exploit.type !== 'agricole') return STADES_VITICOLE;
+  return (culture && STADES_AGRICOLE[culture]) ? STADES_AGRICOLE[culture] : [];
+}
+const DEF_CATS_VITICOLE = ['Mildiou','Oidium','Biocontrole / SDN','Adjuvants','Botrytis','Nutrition foliaire','Insecticides'];
+const DEF_CATS_AGRICOLE = ['Herbicides','Fongicides','Insecticides','Regulateurs de croissance','Adjuvants','Nutrition foliaire'];
 const DEF_PRODUITS = [
   {nom:'HELIOCUIVRE',cat:'Mildiou',dre:48,amm:'',dose:'1L/HA'},
   {nom:'FANTIC',cat:'Mildiou',dre:48,amm:'',dose:'2KG/HA'},
@@ -404,6 +422,7 @@ const S = {
   produits: [],
   parcelles: [],
   categories: [],
+  cultures: [],
   unsubs: []
 };
 
@@ -526,6 +545,10 @@ function listenExploit() {
     S.categories = snap.docs.map(d => ({id: d.id, ...d.data()}));
     S.categories.sort((a,b) => a.nom.localeCompare(b.nom));
     render();
+  }));
+  S.unsubs.push(onSnapshot(sub(eid,'cultures'), snap => {
+    S.cultures = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.cultures.sort((a,b) => a.nom.localeCompare(b.nom));
   }));
 }
 
@@ -672,6 +695,14 @@ window.togglePill = function(pill) {
   recalcDRE();
 };
 
+window.updateStadesFromCulture = function() {
+  const cult = document.getElementById('f-culture');
+  const stadeEl = document.getElementById('f-stade');
+  if (!cult || !stadeEl) return;
+  const stades = STADES_AGRICOLE[cult.value] || [];
+  stadeEl.innerHTML = '<option value="">-- Choisir --</option>' + stades.map(s => '<option value="' + s + '">' + s + '</option>').join('');
+};
+
 function recalcDRE() {
   const actives = document.querySelectorAll('.prod-pill.active');
   let maxDre = 0;
@@ -746,8 +777,10 @@ function renderParcelles() {
       '</div>' +
     '</div>' +
     S.parcelles.map(p => {
+      const ex2 = getEx();
       const infos = [];
       if (p.surface) infos.push(p.surface + ' ha');
+      if (ex2 && ex2.type === 'agricole' && p.culture) infos.push(p.culture);
       if (p.commune) infos.push(p.commune);
       if (p.ilot) infos.push('Ilot ' + p.ilot);
       if (p.gps) infos.push(p.gps);
@@ -782,6 +815,7 @@ function renderExploitations() {
         (e.id === S.currentId ? '<span class="badge badge-vert">Active</span>' : '') +
       '</div>' +
       '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">' +
+        '<span class="badge ' + (e.type==='agricole' ? 'badge-ocre' : 'badge-vert') + '">' + (e.type==='agricole' ? 'Agricole' : 'Viticole') + '</span>' +
         '<span class="badge badge-gris">' + (e.surface||0) + ' ha</span>' +
         (e.ab ? '<span class="badge badge-vert">Agriculture Biologique</span>' : '') +
       '</div>' +
@@ -842,10 +876,25 @@ window.openPassageModal = function(pid) {
       '<div class="form-group"><label>Heure debut (HH:MM)</label><input type="time" id="f-hdeb" value="' + (p ? p.heureDebut||'' : '') + '"></div>' +
       '<div class="form-group"><label>Heure fin (HH:MM)</label><input type="time" id="f-hfin" value="' + (p ? p.heureFin||'' : '') + '"></div>' +
     '</div>' +
-    '<div class="form-group" style="margin-bottom:12px;">' +
-      '<label>Stade phenologique</label>' +
-      '<select id="f-stade"><option value="">-- Choisir --</option>' + STADES.map(s => '<option value="' + s + '"' + (p&&p.stade===s?' selected':'') + '>' + s + '</option>').join('') + '</select>' +
-    '</div>' +
+    (function(){
+      const ex = getEx();
+      const isAgri = ex && ex.type === 'agricole';
+      const cultOpts = isAgri ? S.cultures.map(cu =>
+        '<option value="' + cu.nom + '"' + (p&&p.culture===cu.nom?' selected':'') + '>' + cu.nom + '</option>'
+      ).join('') : '';
+      const stadesSrc = isAgri ? (p&&p.culture ? (STADES_AGRICOLE[p.culture]||[]) : []) : STADES_VITICOLE;
+      return (isAgri ?
+        '<div class="form-group" style="margin-bottom:12px;">' +
+          '<label>Culture</label>' +
+          '<select id="f-culture" onchange="updateStadesFromCulture()">' +
+            '<option value="">-- Choisir une culture --</option>' + cultOpts +
+          '</select>' +
+        '</div>' : '') +
+      '<div class="form-group" style="margin-bottom:12px;">' +
+        '<label>Stade phenologique</label>' +
+        '<select id="f-stade"><option value="">-- Choisir --</option>' + stadesSrc.map(s => '<option value="' + s + '"' + (p&&p.stade===s?' selected':'') + '>' + s + '</option>').join('') + '</select>' +
+      '</div>';
+    })() +
     '<div style="margin-bottom:12px;">' +
       '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--gris);margin-bottom:6px;">Parcelles traitees</div>' +
       '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
@@ -908,9 +957,11 @@ async function savePassage(pid) {
     const base = S.produits.find(p => p.nom === nom && p.cat === cat);
     prodsList.push({nom, cat, dose: dose ? dose.value : (base ? base.dose||'' : ''), dre: base ? base.dre : 0, amm: base ? base.amm||'' : ''});
   });
+  const cultEl2 = document.getElementById('f-culture');
   const data = {
     num: parseInt(document.getElementById('f-num').value)||1,
     campagne: document.getElementById('f-camp').value || S.campagne,
+    culture: cultEl2 ? cultEl2.value : '',
     date: dateRaw,
     heureDebut: document.getElementById('f-hdeb').value,
     heureFin: document.getElementById('f-hfin').value,
@@ -994,9 +1045,15 @@ window.delCat = function(id, nom) {
 // ── PARCELLE ─────────────────────────────────────────────────
 window.openParcelleModal = function(pid) {
   const p = pid ? S.parcelles.find(x => x.id === pid) : null;
+  const ex = getEx();
+  const isAgri = ex && ex.type === 'agricole';
+  const cultOpts = isAgri ? S.cultures.map(cu =>
+    '<option value="' + cu.nom + '"' + (p && p.culture === cu.nom ? ' selected' : '') + '>' + cu.nom + '</option>'
+  ).join('') : '';
   const body =
     '<div class="form-grid">' +
       '<div class="form-group full"><label>Nom de la parcelle</label><input type="text" id="fpar-nom" value="' + (p?p.nom:'') + '" placeholder="LES PARADIS" style="text-transform:uppercase;"></div>' +
+      (isAgri ? '<div class="form-group full"><label>Culture en cours (' + S.campagne + ')</label><select id="fpar-culture"><option value="">-- Choisir --</option>' + cultOpts + '</select></div>' : '') +
       '<div class="form-group"><label>Surface (ha)</label><input type="number" id="fpar-surf" step="0.01" value="' + (p?p.surface||'':'') + '" placeholder="0.00"></div>' +
       '<div class="form-group"><label>N Ilot RPG</label><input type="text" id="fpar-ilot" value="' + (p?p.ilot||'':'') + '"></div>' +
       '<div class="form-group"><label>Code commune INSEE</label><input type="text" id="fpar-com" value="' + (p?p.commune||'':'') + '"></div>' +
@@ -1008,7 +1065,8 @@ window.openParcelleModal = function(pid) {
 async function saveParcelle(pid) {
   const nom = document.getElementById('fpar-nom').value.toUpperCase().trim();
   if (!nom) { toast('Nom requis', true); return; }
-  const data = {nom, surface:parseFloat(document.getElementById('fpar-surf').value)||0, ilot:document.getElementById('fpar-ilot').value, commune:document.getElementById('fpar-com').value, gps:document.getElementById('fpar-gps').value};
+  const cultEl = document.getElementById('fpar-culture');
+  const data = {nom, culture: cultEl ? cultEl.value : '', surface:parseFloat(document.getElementById('fpar-surf').value)||0, ilot:document.getElementById('fpar-ilot').value, commune:document.getElementById('fpar-com').value, gps:document.getElementById('fpar-gps').value};
   try {
     const eid = S.currentId;
     if (pid) await updateDoc(subdoc(eid,'parcelles',pid), data);
@@ -1027,34 +1085,71 @@ window.delParcelle = function(id, nom) {
 // ── EXPLOITATION ─────────────────────────────────────────────
 window.openExploitModal = function(eid) {
   const e = eid ? S.exploitations.find(x => x.id === eid) : null;
+  const isNew = !eid;
   const body =
     '<div class="form-grid">' +
+      (isNew ? '<div class="form-group full"><label>Type d exploitation</label><select id="fe-type" onchange="onExploitTypeChange()" style="font-weight:600;color:var(--vert);"><option value="viticole">Viticole</option><option value="agricole">Agricole</option></select></div>' : '<input type="hidden" id="fe-type" value="' + (e?e.type||'viticole':'viticole') + '">') +
       '<div class="form-group full"><label>Raison sociale / Nom</label><input type="text" id="fe-nom" value="' + (e?e.nom:'') + '" placeholder="EI DUPONT Jean"></div>' +
       '<div class="form-group"><label>N SIRET (14 chiffres)</label><input type="text" id="fe-siret" maxlength="14" value="' + (e?e.siret||'':'') + '"></div>' +
       '<div class="form-group"><label>N Certiphyto</label><input type="text" id="fe-cert" value="' + (e?e.certiphyto||'':'') + '"></div>' +
       '<div class="form-group"><label>Surface totale (ha)</label><input type="number" id="fe-surf" step="0.01" value="' + (e?e.surface||'':'') + '"></div>' +
       '<div class="form-group"><label>Agriculture Biologique</label><select id="fe-ab"><option value="false"' + (e&&!e.ab?' selected':'') + '>Non</option><option value="true"' + (e&&e.ab?' selected':'') + '>Oui</option></select></div>' +
-    '</div>';
+    '</div>' +
+    (isNew ? '<div id="fe-type-info" style="margin-top:10px;padding:10px 14px;background:var(--vert-xxl);border-radius:var(--r-sm);font-size:12px;color:var(--vert);">Base produits viticole (EI CORRE Christine) copiee automatiquement + stades phenologiques vigne.</div>' : '');
   openModal(e ? 'Modifier l exploitation' : 'Nouvelle exploitation', body, () => saveExploit(eid));
 };
 
 async function saveExploit(eid) {
   const nom = document.getElementById('fe-nom').value.trim();
   if (!nom) { toast('Nom requis', true); return; }
-  const data = {nom, siret:document.getElementById('fe-siret').value, certiphyto:document.getElementById('fe-cert').value, surface:parseFloat(document.getElementById('fe-surf').value)||0, ab:document.getElementById('fe-ab').value==='true'};
+  const type = (document.getElementById('fe-type') ? document.getElementById('fe-type').value : null) || 'viticole';
+  const data = {nom, type, siret:document.getElementById('fe-siret').value, certiphyto:document.getElementById('fe-cert').value, surface:parseFloat(document.getElementById('fe-surf').value)||0, ab:document.getElementById('fe-ab').value==='true'};
   try {
     if (eid) {
       await updateDoc(exploitDoc(eid), data);
+      closeModal(); toast('Exploitation enregistree');
     } else {
       data.createdAt = serverTimestamp();
       const ref = await addDoc(exploitsCol(), data);
       S.currentId = ref.id;
-      for (const c of DEF_CATS) await addDoc(sub(ref.id,'categories'), {nom:c});
+      if (type === 'viticole') {
+        // Copier produits + categories depuis EI CORRE Christine (premiere exploitation)
+        const srcId = S.exploitations[0] ? S.exploitations[0].id : null;
+        if (srcId && srcId !== ref.id) {
+          const [catSnap, prodSnap] = await Promise.all([
+            getDocs(sub(srcId,'categories')),
+            getDocs(sub(srcId,'produits'))
+          ]);
+          await Promise.all([
+            ...catSnap.docs.map(d => addDoc(sub(ref.id,'categories'), d.data())),
+            ...prodSnap.docs.map(d => addDoc(sub(ref.id,'produits'), d.data()))
+          ]);
+        } else {
+          for (const cn of DEF_CATS_VITICOLE) await addDoc(sub(ref.id,'categories'), {nom:cn});
+          for (const p of DEF_PRODUITS) await addDoc(sub(ref.id,'produits'), p);
+        }
+      } else {
+        // Exploitation agricole : categories vides
+        for (const cn of DEF_CATS_AGRICOLE) await addDoc(sub(ref.id,'categories'), {nom:cn});
+        // Ajouter cultures
+        for (const cult of CULTURES_AGRICOLE) await addDoc(sub(ref.id,'cultures'), {nom:cult});
+      }
       listenExploit();
+      closeModal(); toast('Exploitation creee');
     }
-    closeModal(); toast('Exploitation enregistree');
   } catch(e) { toast('Erreur : ' + e.message, true); }
 }
+
+window.onExploitTypeChange = function() {
+  const type = document.getElementById('fe-type').value;
+  const info = document.getElementById('fe-type-info');
+  if (!info) return;
+  if (type === 'viticole') {
+    info.textContent = 'Base produits viticole (EI CORRE Christine) copiee automatiquement + stades phenologiques vigne.';
+  } else {
+    info.textContent = 'Base produits agricole vide (Herbicides, Fongicides...) + stades par culture (Ble, Orge, Colza, Tournesol, Mais).';
+  }
+};
 
 window.switchExploit = function(id) {
   if (id === S.currentId) return;
