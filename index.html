@@ -419,11 +419,12 @@ const S = {
   currentId: null,
   campagne: String(new Date().getFullYear()),
   passages: [],
-  produits: [],
-  parcelles: [],
-  categories: [],
-  cultures: [],
-  unsubs: []
+  produits: [],      // depuis base commune
+  categories: [],    // depuis base commune
+  parcelles: [],     // propre a l'exploitation
+  cultures: [],      // propre a l'exploitation (agricole)
+  unsubs: [],
+  unsubBase: []      // listeners base commune
 };
 
 // ── CHEMINS FIRESTORE ────────────────────────────────────────
@@ -431,6 +432,9 @@ const exploitsCol = () => collection(db, 'exploitations');
 const exploitDoc = id => doc(db, 'exploitations', id);
 const sub = (eid, name) => collection(db, 'exploitations', eid, name);
 const subdoc = (eid, name, id) => doc(db, 'exploitations', eid, name, id);
+// Bases communes par type
+const baseCol = (type, name) => collection(db, 'bases', type, name);
+const baseDoc = (type, name, id) => doc(db, 'bases', type, name, id);
 
 // ── UTILS ────────────────────────────────────────────────────
 function fmtDate(v) {
@@ -509,14 +513,35 @@ async function init() {
 async function createDefaultExploit() {
   const ref = await addDoc(exploitsCol(), {
     nom: 'EI CORRE Christine', siret: '', certiphyto: '',
-    surface: 2.92, ab: false, createdAt: serverTimestamp()
+    surface: 2.92, ab: false, type: 'viticole', createdAt: serverTimestamp()
   });
   S.currentId = ref.id;
   const eid = ref.id;
+  // Parcelles dans l'exploitation
   for (const p of DEF_PARCELLES) await addDoc(sub(eid,'parcelles'), p);
-  for (const p of DEF_PRODUITS) await addDoc(sub(eid,'produits'), p);
-  for (const c of DEF_CATS) await addDoc(sub(eid,'categories'), {nom: c});
+  // Base viticole commune (si vide)
+  const baseCatSnap = await getDocs(baseCol('viticole','categories'));
+  if (baseCatSnap.empty) {
+    for (const cn of DEF_CATS_VITICOLE) await addDoc(baseCol('viticole','categories'), {nom:cn});
+    for (const p of DEF_PRODUITS) await addDoc(baseCol('viticole','produits'), p);
+  }
   listenExploit();
+}
+
+function listenBase(type) {
+  // Arreter les anciens listeners base
+  S.unsubBase.forEach(u => u());
+  S.unsubBase = [];
+  S.unsubBase.push(onSnapshot(baseCol(type,'produits'), snap => {
+    S.produits = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.produits.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
+  S.unsubBase.push(onSnapshot(baseCol(type,'categories'), snap => {
+    S.categories = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.categories.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
 }
 
 function listenExploit() {
@@ -633,6 +658,12 @@ function render() {
   document.getElementById('stat-ift').textContent = ift.toFixed(2);
   document.getElementById('stat-parcelles').textContent = S.parcelles.length;
   updateExportResume();
+  const btlEl = document.getElementById('base-type-label');
+  if (btlEl) {
+    const exr = getEx();
+    const btr = (exr && exr.type === 'agricole') ? 'agricole' : 'viticole';
+    btlEl.textContent = 'Base commune ' + btr + ' — ' + S.produits.length + ' produit(s), ' + S.categories.length + ' categorie(s)';
+  }
   renderDash(cp);
   renderPassages(cp);
   renderProduits();
@@ -1009,17 +1040,20 @@ async function saveProduit(pid) {
   const nom = document.getElementById('fp-nom').value.toUpperCase().trim();
   if (!nom) { toast('Nom requis', true); return; }
   const data = {nom, cat:document.getElementById('fp-cat').value, amm:document.getElementById('fp-amm').value, dose:document.getElementById('fp-dose').value, dre:parseInt(document.getElementById('fp-dre').value)||0};
+  const ex = getEx();
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
   try {
-    const eid = S.currentId;
-    if (pid) await updateDoc(subdoc(eid,'produits',pid), data);
-    else await addDoc(sub(eid,'produits'), data);
-    closeModal(); toast('Produit enregistre');
+    if (pid) await updateDoc(baseDoc(btype,'produits',pid), data);
+    else await addDoc(baseCol(btype,'produits'), data);
+    closeModal(); toast('Produit enregistre dans la base ' + btype);
   } catch(e) { toast('Erreur : ' + e.message, true); }
 }
 
 window.delProduit = function(id, nom) {
-  confirm2('Supprimer "' + nom + '" ?', 'Ce produit sera retire de la base. Les passages existants ne seront pas modifies.', async () => {
-    await deleteDoc(subdoc(S.currentId,'produits',id));
+  confirm2('Supprimer "' + nom + '" ?', 'Ce produit sera retire de la base commune. Les passages existants ne seront pas modifies.', async () => {
+    const ex = getEx();
+    const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+    await deleteDoc(baseDoc(btype,'produits',id));
     toast('Produit supprime');
   });
 };
@@ -1031,13 +1065,17 @@ window.openCatModal = function() {
 async function saveCat() {
   const nom = document.getElementById('fc-nom').value.trim();
   if (!nom) { toast('Nom requis', true); return; }
-  await addDoc(sub(S.currentId,'categories'), {nom});
-  closeModal(); toast('Categorie ajoutee');
+  const ex = getEx();
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  await addDoc(baseCol(btype,'categories'), {nom});
+  closeModal(); toast('Categorie ajoutee a la base ' + btype);
 }
 window.delCat = function(id, nom) {
   const n = S.produits.filter(p => p.cat === nom).length;
   confirm2('Supprimer la categorie "' + nom + '" ?', n + ' produit(s) dans cette categorie ne seront pas supprimes.', async () => {
-    await deleteDoc(subdoc(S.currentId,'categories',id));
+    const ex = getEx();
+    const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+    await deleteDoc(baseDoc(btype,'categories',id));
     toast('Categorie supprimee');
   });
 };
@@ -1095,7 +1133,7 @@ window.openExploitModal = function(eid) {
       '<div class="form-group"><label>Surface totale (ha)</label><input type="number" id="fe-surf" step="0.01" value="' + (e?e.surface||'':'') + '"></div>' +
       '<div class="form-group"><label>Agriculture Biologique</label><select id="fe-ab"><option value="false"' + (e&&!e.ab?' selected':'') + '>Non</option><option value="true"' + (e&&e.ab?' selected':'') + '>Oui</option></select></div>' +
     '</div>' +
-    (isNew ? '<div id="fe-type-info" style="margin-top:10px;padding:10px 14px;background:var(--vert-xxl);border-radius:var(--r-sm);font-size:12px;color:var(--vert);">Base produits viticole (EI CORRE Christine) copiee automatiquement + stades phenologiques vigne.</div>' : '');
+    (isNew ? '<div id="fe-type-info" style="margin-top:10px;padding:10px 14px;background:var(--vert-xxl);border-radius:var(--r-sm);font-size:12px;color:var(--vert);">Base produits phytosanitaires viticole partagee (commune a toutes les exploitations viticoles) + stades phenologiques vigne.</div>' : '');
   openModal(e ? 'Modifier l exploitation' : 'Nouvelle exploitation', body, () => saveExploit(eid));
 };
 
@@ -1113,25 +1151,19 @@ async function saveExploit(eid) {
       const ref = await addDoc(exploitsCol(), data);
       S.currentId = ref.id;
       if (type === 'viticole') {
-        // Copier produits + categories depuis EI CORRE Christine (premiere exploitation)
-        const srcId = S.exploitations[0] ? S.exploitations[0].id : null;
-        if (srcId && srcId !== ref.id) {
-          const [catSnap, prodSnap] = await Promise.all([
-            getDocs(sub(srcId,'categories')),
-            getDocs(sub(srcId,'produits'))
-          ]);
-          await Promise.all([
-            ...catSnap.docs.map(d => addDoc(sub(ref.id,'categories'), d.data())),
-            ...prodSnap.docs.map(d => addDoc(sub(ref.id,'produits'), d.data()))
-          ]);
-        } else {
-          for (const cn of DEF_CATS_VITICOLE) await addDoc(sub(ref.id,'categories'), {nom:cn});
-          for (const p of DEF_PRODUITS) await addDoc(sub(ref.id,'produits'), p);
+        // Verifier si la base viticole existe, sinon l'initialiser
+        const baseCatSnap = await getDocs(baseCol('viticole','categories'));
+        if (baseCatSnap.empty) {
+          for (const cn of DEF_CATS_VITICOLE) await addDoc(baseCol('viticole','categories'), {nom:cn});
+          for (const p of DEF_PRODUITS) await addDoc(baseCol('viticole','produits'), p);
         }
       } else {
-        // Exploitation agricole : categories vides
-        for (const cn of DEF_CATS_AGRICOLE) await addDoc(sub(ref.id,'categories'), {nom:cn});
-        // Ajouter cultures
+        // Verifier si la base agricole existe, sinon l'initialiser
+        const baseAgriSnap = await getDocs(baseCol('agricole','categories'));
+        if (baseAgriSnap.empty) {
+          for (const cn of DEF_CATS_AGRICOLE) await addDoc(baseCol('agricole','categories'), {nom:cn});
+        }
+        // Cultures propres a l'exploitation
         for (const cult of CULTURES_AGRICOLE) await addDoc(sub(ref.id,'cultures'), {nom:cult});
       }
       listenExploit();
@@ -1145,9 +1177,9 @@ window.onExploitTypeChange = function() {
   const info = document.getElementById('fe-type-info');
   if (!info) return;
   if (type === 'viticole') {
-    info.textContent = 'Base produits viticole (EI CORRE Christine) copiee automatiquement + stades phenologiques vigne.';
+    info.textContent = 'Base produits phytosanitaires viticole partagee (commune a toutes les exploitations viticoles) + stades phenologiques vigne.';
   } else {
-    info.textContent = 'Base produits agricole vide (Herbicides, Fongicides...) + stades par culture (Ble, Orge, Colza, Tournesol, Mais).';
+    info.textContent = 'Base produits phytosanitaires agricole partagee (commune a toutes les exploitations agricoles) + stades par culture (Ble, Orge, Colza, Tournesol, Mais).';
   }
 };
 
