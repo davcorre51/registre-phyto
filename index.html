@@ -337,7 +337,7 @@ tr:hover td{background:var(--vert-xxl);}
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARkXeCqBH2lSbfG_YsTuMJfY6NtUrwosg",
@@ -1044,9 +1044,13 @@ async function saveProduit(pid) {
   const ex = getEx();
   const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
   try {
-    if (pid) await updateDoc(baseDoc(btype,'produits',pid), data);
-    else await addDoc(baseCol(btype,'produits'), data);
-    closeModal(); toast('Produit enregistre dans la base ' + btype);
+    if (pid) {
+      // setDoc avec merge=true : cree le document s'il n'existe pas, le met a jour s'il existe
+      await setDoc(baseDoc(btype,'produits',pid), data, {merge: true});
+    } else {
+      await addDoc(baseCol(btype,'produits'), data);
+    }
+    closeModal(); toast('Produit enregistre');
   } catch(e) { toast('Erreur : ' + e.message, true); }
 }
 
