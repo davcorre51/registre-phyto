@@ -403,7 +403,7 @@ const DEF_PRODUITS = [
   {nom:'VIVAFLOR',cat:'Nutrition foliaire',dre:0,amm:'',dose:'3L/Ha'}
 ];
 const DEF_PARCELLES = [
-  {nom:'CHALMONTS',surface:0.4,ilot:'',commune:'',gps:''},
+  {nom:'CHALMONTS',surface:0.4,ilot:'',ville:'',commune:'',gps:''},
   {nom:'SABLONS',surface:0.35,ilot:'',commune:'',gps:''},
   {nom:'LES MACHERETS',surface:0.3,ilot:'',commune:'',gps:''},
   {nom:'PINOCHES',surface:0.25,ilot:'',commune:'',gps:''},
@@ -812,7 +812,8 @@ function renderParcelles() {
       const infos = [];
       if (p.surface) infos.push(p.surface + ' ha');
       if (ex2 && ex2.type === 'agricole' && p.culture) infos.push(p.culture);
-      if (p.commune) infos.push(p.commune);
+      if (p.ville) infos.push(p.ville);
+      if (p.commune) infos.push('INSEE : ' + p.commune);
       if (p.ilot) infos.push('Ilot ' + p.ilot);
       if (p.gps) infos.push(p.gps);
       return '<div class="parcelle-item">' +
@@ -1094,7 +1095,8 @@ window.openParcelleModal = function(pid) {
       (isAgri ? '<div class="form-group full"><label>Culture en cours (' + S.campagne + ')</label><select id="fpar-culture"><option value="">-- Choisir --</option>' + cultOpts + '</select></div>' : '') +
       '<div class="form-group"><label>Surface (ha)</label><input type="number" id="fpar-surf" step="0.01" value="' + (p?p.surface||'':'') + '" placeholder="0.00"></div>' +
       '<div class="form-group"><label>N Ilot RPG</label><input type="text" id="fpar-ilot" value="' + (p?p.ilot||'':'') + '"></div>' +
-      '<div class="form-group"><label>Code commune INSEE</label><input type="text" id="fpar-com" value="' + (p?p.commune||'':'') + '"></div>' +
+'<div class="form-group"><label>Nom de la commune</label><input type="text" id="fpar-ville" value="' + (p?p.ville||'':'') + '" placeholder="ex: Vertus"></div>' +
+      '<div class="form-group"><label>Code INSEE</label><input type="text" id="fpar-com" value="' + (p?p.commune||'':'') + '" placeholder="ex: 51606"></div>' +
       '<div class="form-group full"><label>Coordonnees GPS</label><input type="text" id="fpar-gps" value="' + (p?p.gps||'':'') + '" placeholder="48.123, 3.456"></div>' +
     '</div>';
   openModal(p ? 'Modifier la parcelle' : 'Nouvelle parcelle', body, () => saveParcelle(pid));
@@ -1104,7 +1106,7 @@ async function saveParcelle(pid) {
   const nom = document.getElementById('fpar-nom').value.toUpperCase().trim();
   if (!nom) { toast('Nom requis', true); return; }
   const cultEl = document.getElementById('fpar-culture');
-  const data = {nom, culture: cultEl ? cultEl.value : '', surface:parseFloat(document.getElementById('fpar-surf').value)||0, ilot:document.getElementById('fpar-ilot').value, commune:document.getElementById('fpar-com').value, gps:document.getElementById('fpar-gps').value};
+  const data = {nom, culture: cultEl ? cultEl.value : '', surface:parseFloat(document.getElementById('fpar-surf').value)||0, ilot:document.getElementById('fpar-ilot').value, ville:document.getElementById('fpar-ville').value, commune:document.getElementById('fpar-com').value, gps:document.getElementById('fpar-gps').value};
   try {
     const eid = S.currentId;
     if (pid) await updateDoc(subdoc(eid,'parcelles',pid), data);
