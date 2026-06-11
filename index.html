@@ -499,10 +499,7 @@ async function init() {
     S.exploitations = snap.docs.map(d => ({id: d.id, ...d.data()}));
     if (!S.currentId && S.exploitations.length > 0) {
       S.currentId = S.exploitations[0].id;
-      // Migration automatique des anciens produits vers base commune
-      migrateOldProduits().then(() => {
-        listenExploit();
-      });
+      listenExploit();
     }
     if (S.exploitations.length === 0) {
       createDefaultExploit();
@@ -531,48 +528,6 @@ async function createDefaultExploit() {
   listenExploit();
 }
 
-// ── MIGRATION : ancienne collection -> base commune ────────────
-async function migrateOldProduits() {
-  // Pour chaque exploitation viticole, verifier si ancienne collection existe
-  for (const ex of S.exploitations) {
-    const btype = (ex.type === 'agricole') ? 'agricole' : 'viticole';
-
-    // Lire ancienne collection produits
-    const oldProdsSnap = await getDocs(sub(ex.id, 'produits'));
-    if (!oldProdsSnap.empty) {
-      toast('Migration des produits en cours...');
-      // Verifier si base commune deja peuplee
-      const baseProdsSnap = await getDocs(baseCol(btype, 'produits'));
-      const baseNoms = baseProdsSnap.docs.map(d => d.data().nom);
-      // Copier chaque produit absent de la base commune
-      for (const d of oldProdsSnap.docs) {
-        const data = d.data();
-        if (!baseNoms.includes(data.nom)) {
-          await addDoc(baseCol(btype, 'produits'), data);
-        }
-        // Supprimer de l'ancienne collection
-        await deleteDoc(subdoc(ex.id, 'produits', d.id));
-      }
-      toast('Produits migres vers la base commune ' + btype);
-    }
-
-    // Lire ancienne collection categories
-    const oldCatsSnap = await getDocs(sub(ex.id, 'categories'));
-    if (!oldCatsSnap.empty) {
-      const baseCatsSnap = await getDocs(baseCol(btype, 'categories'));
-      const baseNomsCats = baseCatsSnap.docs.map(d => d.data().nom);
-      for (const d of oldCatsSnap.docs) {
-        const data = d.data();
-        if (!baseNomsCats.includes(data.nom)) {
-          await addDoc(baseCol(btype, 'categories'), data);
-        }
-        // Supprimer de l'ancienne collection
-        await deleteDoc(subdoc(ex.id, 'categories', d.id));
-      }
-    }
-  }
-}
-
 function listenBase(type) {
   // Arreter les anciens listeners base
   S.unsubBase.forEach(u => u());
@@ -588,6 +543,35 @@ function listenBase(type) {
     render();
   }));
 }
+
+window.resetBaseViticole = async function() {
+  if (!confirm('Reinitialiser la base viticole avec les produits par defaut ? Les produits existants ne seront pas dupliques.')) return;
+  loading(true);
+  try {
+    // Reinit categories
+    const baseCatsSnap = await getDocs(baseCol('viticole','categories'));
+    const existCats = baseCatsSnap.docs.map(d => d.data().nom);
+    for (const cn of DEF_CATS_VITICOLE) {
+      if (!existCats.includes(cn)) await addDoc(baseCol('viticole','categories'), {nom:cn});
+    }
+    // Reinit produits
+    const baseProdsSnap = await getDocs(baseCol('viticole','produits'));
+    const existProds = baseProdsSnap.docs.map(d => d.data().nom);
+    for (const p of DEF_PRODUITS) {
+      if (!existProds.includes(p.nom)) await addDoc(baseCol('viticole','produits'), p);
+    }
+    // Reinit parcelles sur exploitation courante
+    const parcSnap = await getDocs(sub(S.currentId,'parcelles'));
+    if (parcSnap.empty) {
+      for (const p of DEF_PARCELLES) await addDoc(sub(S.currentId,'parcelles'), p);
+    }
+    loading(false);
+    toast('Base viticole reinitialisee');
+  } catch(e) {
+    loading(false);
+    toast('Erreur : ' + e.message, true);
+  }
+};
 
 function listenExploit() {
   S.unsubs.forEach(u => u());
