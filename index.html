@@ -499,7 +499,10 @@ async function init() {
     S.exploitations = snap.docs.map(d => ({id: d.id, ...d.data()}));
     if (!S.currentId && S.exploitations.length > 0) {
       S.currentId = S.exploitations[0].id;
-      listenExploit();
+      // Migration automatique des anciens produits vers base commune
+      migrateOldProduits().then(() => {
+        listenExploit();
+      });
     }
     if (S.exploitations.length === 0) {
       createDefaultExploit();
@@ -526,6 +529,48 @@ async function createDefaultExploit() {
     for (const p of DEF_PRODUITS) await addDoc(baseCol('viticole','produits'), p);
   }
   listenExploit();
+}
+
+// ── MIGRATION : ancienne collection -> base commune ────────────
+async function migrateOldProduits() {
+  // Pour chaque exploitation viticole, verifier si ancienne collection existe
+  for (const ex of S.exploitations) {
+    const btype = (ex.type === 'agricole') ? 'agricole' : 'viticole';
+
+    // Lire ancienne collection produits
+    const oldProdsSnap = await getDocs(sub(ex.id, 'produits'));
+    if (!oldProdsSnap.empty) {
+      toast('Migration des produits en cours...');
+      // Verifier si base commune deja peuplee
+      const baseProdsSnap = await getDocs(baseCol(btype, 'produits'));
+      const baseNoms = baseProdsSnap.docs.map(d => d.data().nom);
+      // Copier chaque produit absent de la base commune
+      for (const d of oldProdsSnap.docs) {
+        const data = d.data();
+        if (!baseNoms.includes(data.nom)) {
+          await addDoc(baseCol(btype, 'produits'), data);
+        }
+        // Supprimer de l'ancienne collection
+        await deleteDoc(subdoc(ex.id, 'produits', d.id));
+      }
+      toast('Produits migres vers la base commune ' + btype);
+    }
+
+    // Lire ancienne collection categories
+    const oldCatsSnap = await getDocs(sub(ex.id, 'categories'));
+    if (!oldCatsSnap.empty) {
+      const baseCatsSnap = await getDocs(baseCol(btype, 'categories'));
+      const baseNomsCats = baseCatsSnap.docs.map(d => d.data().nom);
+      for (const d of oldCatsSnap.docs) {
+        const data = d.data();
+        if (!baseNomsCats.includes(data.nom)) {
+          await addDoc(baseCol(btype, 'categories'), data);
+        }
+        // Supprimer de l'ancienne collection
+        await deleteDoc(subdoc(ex.id, 'categories', d.id));
+      }
+    }
+  }
 }
 
 function listenBase(type) {
