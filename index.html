@@ -550,31 +550,31 @@ function listenExploit() {
   const eid = S.currentId;
   if (!eid) return;
 
+  // Passages : propres a l'exploitation
   S.unsubs.push(onSnapshot(sub(eid,'passages'), snap => {
     S.passages = snap.docs.map(d => ({id: d.id, ...d.data()}));
     S.passages.sort((a,b) => toISO(a.date) < toISO(b.date) ? -1 : 1);
     updateCampagneSelector();
     render();
   }));
-  S.unsubs.push(onSnapshot(sub(eid,'produits'), snap => {
-    S.produits = snap.docs.map(d => ({id: d.id, ...d.data()}));
-    S.produits.sort((a,b) => a.nom.localeCompare(b.nom));
-    render();
-  }));
+
+  // Parcelles : propres a l'exploitation
   S.unsubs.push(onSnapshot(sub(eid,'parcelles'), snap => {
     S.parcelles = snap.docs.map(d => ({id: d.id, ...d.data()}));
     S.parcelles.sort((a,b) => a.nom.localeCompare(b.nom));
     render();
   }));
-  S.unsubs.push(onSnapshot(sub(eid,'categories'), snap => {
-    S.categories = snap.docs.map(d => ({id: d.id, ...d.data()}));
-    S.categories.sort((a,b) => a.nom.localeCompare(b.nom));
-    render();
-  }));
+
+  // Cultures : propres a l'exploitation (agricole)
   S.unsubs.push(onSnapshot(sub(eid,'cultures'), snap => {
     S.cultures = snap.docs.map(d => ({id: d.id, ...d.data()}));
     S.cultures.sort((a,b) => a.nom.localeCompare(b.nom));
   }));
+
+  // Produits et categories : base commune selon type exploitation
+  const ex = S.exploitations.find(e => e.id === eid);
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  listenBase(btype);
 }
 
 // ── CAMPAGNE ─────────────────────────────────────────────────
