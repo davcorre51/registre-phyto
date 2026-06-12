@@ -1070,6 +1070,7 @@ function renderProduits() {
         '<span class="produits-cat-name">' + cat + '</span>' +
         '<div style="display:flex;align-items:center;gap:8px;">' +
           '<span style="font-size:11px;color:var(--gris);">' + prods.length + ' produit(s)</span>' +
+          (catObj ? '<button class="btn btn-icon edt" onclick="event.stopPropagation();openEditCatModal(\'' + catObj.id + '\',\'' + cat + '\')" title="Modifier">✏️</button>' : '') +
           (catObj ? '<button class="btn btn-icon del" onclick="event.stopPropagation();delCat(\'' + catObj.id + '\',\'' + cat + '\')" title="Supprimer">🗑️</button>' : '') +
         '</div>' +
       '</div>' +
@@ -1364,24 +1365,82 @@ window.delProduit = function(id, nom) {
 };
 
 // ── CATEGORIE ────────────────────────────────────────────────
+// Créer une catégorie
 window.openCatModal = function() {
-  openModal('Nouvelle categorie', '<div class="form-group"><label>Nom</label><input type="text" id="fc-nom" placeholder="ex: Herbicides"></div>', saveCat);
+  openModal(
+    'Nouvelle categorie',
+    '<div class="form-group"><label>Nom de la categorie</label><input type="text" id="fc-nom" placeholder="ex: Herbicides"></div>',
+    saveCat
+  );
 };
 async function saveCat() {
   const nom = document.getElementById('fc-nom').value.trim();
   if (!nom) { toast('Nom requis', true); return; }
   const ex = getEx();
   const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  // Vérifier doublon
+  if (S.categories.find(c => c.nom.toLowerCase() === nom.toLowerCase())) {
+    toast('Cette categorie existe deja', true); return;
+  }
   await addDoc(baseCol(btype,'categories'), {nom});
-  closeModal(); toast('Categorie ajoutee a la base ' + btype);
+  closeModal(); toast('Categorie ajoutee');
 }
+
+// Modifier le nom d'une catégorie
+window.openEditCatModal = function(id, nomActuel) {
+  openModal(
+    'Modifier la categorie',
+    '<div class="form-group"><label>Nouveau nom</label><input type="text" id="fc-nom-edit" value="' + nomActuel + '"></div>',
+    () => saveEditCat(id, nomActuel)
+  );
+};
+async function saveEditCat(id, ancienNom) {
+  const nouveauNom = document.getElementById('fc-nom-edit').value.trim();
+  if (!nouveauNom) { toast('Nom requis', true); return; }
+  if (nouveauNom === ancienNom) { closeModal(); return; }
+  const ex = getEx();
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  loading(true);
+  try {
+    // 1. Mettre à jour le nom de la catégorie
+    await setDoc(baseDoc(btype,'categories',id), {nom: nouveauNom});
+    // 2. Mettre à jour le champ cat de tous les produits concernés
+    const prodsACorriger = S.produits.filter(p => p.cat === ancienNom);
+    for (const p of prodsACorriger) {
+      await setDoc(baseDoc(btype,'produits',p.id), {...p, cat: nouveauNom});
+    }
+    loading(false);
+    closeModal();
+    toast('Categorie renommee (' + prodsACorriger.length + ' produit(s) mis a jour)');
+  } catch(e) {
+    loading(false);
+    toast('Erreur : ' + e.message, true);
+  }
+}
+
+// Supprimer une catégorie ET tous ses produits
 window.delCat = function(id, nom) {
-  const n = S.produits.filter(p => p.cat === nom).length;
-  confirm2('Supprimer la categorie "' + nom + '" ?', n + ' produit(s) dans cette categorie ne seront pas supprimes.', async () => {
+  const prods = S.produits.filter(p => p.cat === nom);
+  const msg = prods.length
+    ? 'Cette categorie contient ' + prods.length + ' produit(s) qui seront AUSSI supprimes definitivement.'
+    : 'Cette categorie est vide.';
+  confirm2('Supprimer "' + nom + '" ?', msg, async () => {
     const ex = getEx();
     const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
-    await deleteDoc(baseDoc(btype,'categories',id));
-    toast('Categorie supprimee');
+    loading(true);
+    try {
+      // 1. Supprimer tous les produits de cette catégorie
+      for (const p of prods) {
+        await deleteDoc(baseDoc(btype,'produits',p.id));
+      }
+      // 2. Supprimer la catégorie
+      await deleteDoc(baseDoc(btype,'categories',id));
+      loading(false);
+      toast('Categorie et ' + prods.length + ' produit(s) supprimes');
+    } catch(e) {
+      loading(false);
+      toast('Erreur : ' + e.message, true);
+    }
   });
 };
 
