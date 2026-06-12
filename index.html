@@ -170,9 +170,10 @@ tr:hover td{background:var(--vert-xxl);}
 .prod-pill.active{border-color:var(--vert-l);background:var(--vert-xxl);}
 .prod-pill-name{padding:8px 14px;font-size:13px;font-weight:500;color:var(--gris);user-select:none;}
 .prod-pill.active .prod-pill-name{color:var(--vert);font-weight:600;}
-.prod-pill-dose{display:none;padding:6px 10px;background:var(--vert-xl);border-left:1.5px solid var(--vert-l);}
-.prod-pill.active .prod-pill-dose{display:block;}
-.prod-pill-dose input{border:none;background:transparent;font-size:12px;color:var(--vert);font-weight:600;width:80px;outline:none;font-family:inherit;}
+.prod-pill-dose{display:none;padding:5px 8px;background:var(--vert-xl);border-left:1.5px solid var(--vert-l);align-items:center;gap:4px;}
+.prod-pill.active .prod-pill-dose{display:flex;}
+.pill-qte{border:none;background:transparent;font-size:12px;color:var(--vert);font-weight:600;width:55px;outline:none;font-family:inherit;}
+.pill-unite{border:none;background:transparent;font-size:11px;color:var(--vert);font-weight:600;outline:none;font-family:inherit;cursor:pointer;padding:0;}
 
 .stades-row{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;scrollbar-width:none;}
 .stade-pill{background:var(--vert-xxl);border:1px solid var(--vert-xl);border-radius:20px;padding:3px 10px;font-size:11px;white-space:nowrap;color:var(--vert);font-weight:500;cursor:pointer;}
@@ -352,6 +353,8 @@ const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
 
 // ── CONSTANTES ──────────────────────────────────────────────
+const UNITES = ['L/HA', 'KG/HA'];
+
 const STADES_VITICOLE = [
   'Bourgeon dans le coton','Feuilles etalees','Grappes visibles',
   'Grappes separees','Boutons floraux separes','Debut fleur',
@@ -995,7 +998,7 @@ function renderPassages(cp) {
     prods.forEach(pr => { if (!byCat[pr.cat]) byCat[pr.cat] = []; byCat[pr.cat].push(pr); });
     const bodyHTML = Object.entries(byCat).map(([cat,list]) =>
       '<div class="prod-cat-title">' + cat + '</div>' +
-      list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span class="badge badge-gris">' + (pr.dose||'') + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;">DRE ' + pr.dre + 'h</span>' : '') + '</div>').join('')
+      list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span class="badge badge-gris">' + (pr.qte ? pr.qte + ' ' + (pr.unite||'') : (pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;">DRE ' + pr.dre + 'h</span>' : '') + '</div>').join('')
     ).join('') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + p.notes + '</div>' : '');
 
     return '<div class="passage-item">' +
@@ -1016,12 +1019,30 @@ function renderPassages(cp) {
   }).join('');
 }
 
+// Extraire quantite et unite depuis une chaine "1.5 L/HA"
+function extractQte(dose) {
+  if (!dose) return '';
+  const m = dose.match(/^([0-9.,]+)/);
+  return m ? m[1].replace(',','.') : '';
+}
+function extractUnite(dose, defaut) {
+  if (!dose) return defaut || 'L/HA';
+  for (const u of UNITES) {
+    if (dose.toUpperCase().includes(u)) return u;
+  }
+  return defaut || 'L/HA';
+}
+
 window.togglePill = function(pill) {
   pill.classList.toggle('active');
   if (pill.classList.contains('active')) {
-    const dose = pill.querySelector('.pill-dose');
+    const qteEl = pill.querySelector('.pill-qte');
     const base = S.produits.find(p => p.nom === pill.dataset.nom && p.cat === pill.dataset.cat);
-    if (dose && base && !dose.value) dose.value = base.dose || '';
+    if (qteEl && base && !qteEl.value) {
+      qteEl.value = base.qte || extractQte(base.dose||'');
+      const uniteEl = pill.querySelector('.pill-unite');
+      if (uniteEl) uniteEl.value = base.unite || extractUnite(base.dose||'', 'L/HA');
+    }
   }
   recalcDRE();
 };
@@ -1075,9 +1096,9 @@ function renderProduits() {
         '</div>' +
       '</div>' +
       '<div id="' + catKey + '">' +
-        '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose</th><th>DRE (h)</th><th>N AMM</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
+        '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Quantite</th><th>DRE (h)</th><th>N AMM</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
         (prods.length ? prods.map(p =>
-          '<tr><td style="font-weight:600;">' + p.nom + '</td><td>' + (p.dose||'-') + '</td><td>' + (p.dre||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td>' +
+          '<tr><td style="font-weight:600;">' + p.nom + '</td><td>' + (p.qte ? p.qte + ' ' + (p.unite||'') : (p.dose||'-')) + '</td><td>' + (p.dre||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td>' +
           '<td><div class="td-actions"><button class="btn btn-icon edt" onclick="openProduitModal(\'' + p.id + '\',null)" title="Modifier">✏️</button><button class="btn btn-icon del" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>'
         ).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--gris);font-size:12px;padding:12px;">Aucun produit</td></tr>') +
         '</tbody></table></div>' +
@@ -1192,9 +1213,16 @@ window.openPassageModal = function(pid) {
       catProds.map(pr => {
         const sel = existing.find(e => e.nom === pr.nom);
         const isActive = !!sel;
-        return '<div class="prod-pill' + (isActive ? ' active' : '') + '" data-cat="' + cat + '" data-nom="' + pr.nom + '" data-dre="' + (pr.dre||0) + '" data-amm="' + (pr.amm||'') + '" onclick="togglePill(this)">' +
+        const selQte = sel ? (sel.qte !== undefined ? sel.qte : extractQte(sel.dose||'')) : (pr.qte || extractQte(pr.dose||''));
+        const selUnite = sel ? (sel.unite || extractUnite(sel.dose||'', pr.unite||'L/HA')) : (pr.unite || 'L/HA');
+        return '<div class="prod-pill' + (isActive ? ' active' : '') + '" data-cat="' + cat + '" data-nom="' + pr.nom + '" data-dre="' + (pr.dre||0) + '" data-amm="' + (pr.amm||'') + '" data-unite="' + selUnite + '" onclick="togglePill(this)">' +
           '<div class="prod-pill-name">' + pr.nom + '</div>' +
-          '<div class="prod-pill-dose"><input type="text" class="pill-dose" value="' + (sel ? sel.dose||'' : pr.dose||'') + '" placeholder="dose" onclick="event.stopPropagation()"></div>' +
+          '<div class="prod-pill-dose" style="display:flex;align-items:center;gap:4px;">' +
+            '<input type="number" class="pill-qte" step="0.01" value="' + (selQte||'') + '" placeholder="qte" onclick="event.stopPropagation()" style="width:60px;">' +
+            '<select class="pill-unite" onclick="event.stopPropagation()" style="font-size:11px;padding:4px 5px;border:none;background:transparent;color:var(--vert);font-weight:600;cursor:pointer;">' +
+              UNITES.map(u => '<option value="' + u + '"' + (u===selUnite?' selected':'') + '>' + u + '</option>').join('') +
+            '</select>' +
+          '</div>' +
         '</div>';
       }).join('') +
       '</div></div>';
@@ -1286,9 +1314,13 @@ async function savePassage(pid) {
   document.querySelectorAll('.prod-pill.active').forEach(pill => {
     const nom = pill.dataset.nom;
     const cat = pill.dataset.cat;
-    const dose = pill.querySelector('.pill-dose');
+    const qteEl = pill.querySelector('.pill-qte');
+    const uniteEl = pill.querySelector('.pill-unite');
     const base = S.produits.find(p => p.nom === nom && p.cat === cat);
-    prodsList.push({nom, cat, dose: dose ? dose.value : (base ? base.dose||'' : ''), dre: base ? base.dre : 0, amm: base ? base.amm||'' : ''});
+    const qte = qteEl ? qteEl.value : '';
+    const unite = uniteEl ? uniteEl.value : (base ? base.unite||'L/HA' : 'L/HA');
+    const dose = qte ? (qte + ' ' + unite) : '';
+    prodsList.push({nom, cat, dose, qte: parseFloat(qte)||0, unite, dre: base ? base.dre : 0, amm: base ? base.amm||'' : ''});
   });
   const cultEl2 = document.getElementById('f-culture');
   const data = {
@@ -1332,7 +1364,8 @@ window.openProduitModal = function(pid, defCat) {
         catNames.map(c => '<option value="' + c + '"' + ((p&&p.cat===c)||(defCat===c)?' selected':'') + '>' + c + '</option>').join('') +
       '</select></div>' +
       '<div class="form-group"><label>N AMM</label><input type="text" id="fp-amm" value="' + (p?p.amm||'':'') + '" placeholder="7 chiffres"></div>' +
-      '<div class="form-group"><label>Dose habituelle</label><input type="text" id="fp-dose" value="' + (p?p.dose||'':'') + '" placeholder="2L/HA"></div>' +
+      '<div class="form-group"><label>Quantite habituelle</label><input type="number" id="fp-qte" step="0.01" value="' + (p?p.qte||'':'') + '" placeholder="ex: 1.5"></div>' +
+      '<div class="form-group"><label>Unite</label><select id="fp-unite">' + UNITES.map(u => '<option value="' + u + '"' + (p&&p.unite===u?' selected':'') + '>' + u + '</option>').join('') + '</select></div>' +
       '<div class="form-group"><label>DRE (heures)</label><input type="number" id="fp-dre" value="' + (p?p.dre||0:0) + '"></div>' +
     '</div>';
   openModal(p ? 'Modifier le produit' : 'Nouveau produit', body, () => saveProduit(pid));
@@ -1341,7 +1374,10 @@ window.openProduitModal = function(pid, defCat) {
 async function saveProduit(pid) {
   const nom = document.getElementById('fp-nom').value.toUpperCase().trim();
   if (!nom) { toast('Nom requis', true); return; }
-  const data = {nom, cat:document.getElementById('fp-cat').value, amm:document.getElementById('fp-amm').value, dose:document.getElementById('fp-dose').value, dre:parseInt(document.getElementById('fp-dre').value)||0};
+  const qte = document.getElementById('fp-qte').value;
+  const unite = document.getElementById('fp-unite').value;
+  const dose = qte ? (qte + ' ' + unite) : '';
+  const data = {nom, cat:document.getElementById('fp-cat').value, amm:document.getElementById('fp-amm').value, dose, qte: parseFloat(qte)||0, unite, dre:parseInt(document.getElementById('fp-dre').value)||0};
   const ex = getEx();
   const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
   try {
