@@ -544,6 +544,277 @@ function listenBase(type) {
   }));
 }
 
+// ── IMPORT PRODUITS DEPUIS EXCEL ────────────────────────────
+const PRODUITS_EXCEL = [
+  {
+    "nom": "EPERON PEPITE",
+    "cat": "Mildiou",
+    "dre": 48,
+    "amm": "",
+    "dose": ""
+  },
+  {
+    "nom": "ELECTIS BLEU",
+    "cat": "Mildiou",
+    "dre": 24,
+    "amm": "",
+    "dose": "1,96L/HA"
+  },
+  {
+    "nom": "FORUM TOP",
+    "cat": "Mildiou",
+    "dre": 48,
+    "amm": "",
+    "dose": ""
+  },
+  {
+    "nom": "KENKIO",
+    "cat": "Mildiou",
+    "dre": 6,
+    "amm": "",
+    "dose": ""
+  },
+  {
+    "nom": "AMPHORE PEPITE",
+    "cat": "Mildiou",
+    "dre": 48,
+    "amm": "",
+    "dose": ""
+  },
+  {
+    "nom": "PRIVEST",
+    "cat": "Mildiou",
+    "dre": 48,
+    "amm": "",
+    "dose": ""
+  },
+  {
+    "nom": "FANTIC",
+    "cat": "Mildiou",
+    "dre": 48,
+    "amm": "",
+    "dose": "2KG/HA"
+  },
+  {
+    "nom": "PEXIUM",
+    "cat": "Mildiou",
+    "dre": 48,
+    "amm": "",
+    "dose": "0,5KG/HA"
+  },
+  {
+    "nom": "ZORVEC",
+    "cat": "Mildiou",
+    "dre": 48,
+    "amm": "",
+    "dose": "0,2L/HA"
+  },
+  {
+    "nom": "FOLPAN",
+    "cat": "Mildiou",
+    "dre": 48,
+    "amm": "",
+    "dose": "1,25KG/HA"
+  },
+  {
+    "nom": "VIDERYO",
+    "cat": "Mildiou",
+    "dre": 48,
+    "amm": "",
+    "dose": "2,5L/HA"
+  },
+  {
+    "nom": "FUTURA",
+    "cat": "Mildiou",
+    "dre": 48,
+    "amm": "",
+    "dose": "4L/HA"
+  },
+  {
+    "nom": "HELIOCUIVRE",
+    "cat": "Mildiou",
+    "dre": 48,
+    "amm": "",
+    "dose": "1L/HA"
+  },
+  {
+    "nom": "THIOVIT JET",
+    "cat": "Oidium",
+    "dre": 6,
+    "amm": "",
+    "dose": ""
+  },
+  {
+    "nom": "CYFLODIUIM",
+    "cat": "Oidium",
+    "dre": 24,
+    "amm": "",
+    "dose": ""
+  },
+  {
+    "nom": "NATIVO",
+    "cat": "Oidium",
+    "dre": 48,
+    "amm": "",
+    "dose": ""
+  },
+  {
+    "nom": "ALGEBRE",
+    "cat": "Oidium",
+    "dre": 6,
+    "amm": "",
+    "dose": ""
+  },
+  {
+    "nom": "DYNALI",
+    "cat": "Oidium",
+    "dre": 6,
+    "amm": "",
+    "dose": ""
+  },
+  {
+    "nom": "KARATHANE",
+    "cat": "Oidium",
+    "dre": 48,
+    "amm": "",
+    "dose": ""
+  },
+  {
+    "nom": "MICROTHIOL",
+    "cat": "Oidium",
+    "dre": 6,
+    "amm": "",
+    "dose": "10KG/HA"
+  },
+  {
+    "nom": "VIVANDO",
+    "cat": "Oidium",
+    "dre": 6,
+    "amm": "",
+    "dose": "0,2L/HA"
+  },
+  {
+    "nom": "YARIS",
+    "cat": "Oidium",
+    "dre": 48,
+    "amm": "",
+    "dose": "0,15L/HA"
+  },
+  {
+    "nom": "HOGGAR",
+    "cat": "Oidium",
+    "dre": 48,
+    "amm": "",
+    "dose": "0,6L/HA"
+  },
+  {
+    "nom": "REVYVIT",
+    "cat": "Oidium",
+    "dre": 48,
+    "amm": "",
+    "dose": "2L/HA"
+  },
+  {
+    "nom": "LUNA XTEND",
+    "cat": "Oidium",
+    "dre": 48,
+    "amm": "",
+    "dose": "0,2L/HA"
+  },
+  {
+    "nom": "THIOPRON RAIN FREE",
+    "cat": "Oidium",
+    "dre": 48,
+    "amm": "",
+    "dose": "6,8L/HA"
+  },
+  {
+    "nom": "REDELI",
+    "cat": "Biocontrole / SDN",
+    "dre": 0,
+    "amm": "",
+    "dose": "2,5L/Ha"
+  },
+  {
+    "nom": "VINIVAX",
+    "cat": "Biocontrole / SDN",
+    "dre": 0,
+    "amm": "",
+    "dose": "1L/Ha"
+  },
+  {
+    "nom": "INVELOP",
+    "cat": "Biocontrole / SDN",
+    "dre": 0,
+    "amm": "",
+    "dose": "10KG/HA"
+  },
+  {
+    "nom": "STICMAN",
+    "cat": "Adjuvants",
+    "dre": 0,
+    "amm": "",
+    "dose": "0,14L/HL"
+  },
+  {
+    "nom": "ISOTAC",
+    "cat": "Adjuvants",
+    "dre": 0,
+    "amm": "",
+    "dose": "0,3L/HL"
+  },
+  {
+    "nom": "GEOXE",
+    "cat": "Botrytis",
+    "dre": 48,
+    "amm": "",
+    "dose": "1KG/HA"
+  },
+  {
+    "nom": "NUTRIBIO FE",
+    "cat": "Nutrition foliaire",
+    "dre": 0,
+    "amm": "",
+    "dose": "3L/Ha"
+  },
+  {
+    "nom": "VIVAFLOR",
+    "cat": "Nutrition foliaire",
+    "dre": 0,
+    "amm": "",
+    "dose": "3L/Ha"
+  }
+];
+
+window.importProduitsExcel = async function() {
+  if (!confirm('Importer ' + PRODUITS_EXCEL.length + ' produits depuis le fichier CAMPAGNE_PHYTO_Christine ? Les doublons (meme nom) seront ignores.')) return;
+  loading(true);
+  try {
+    // S'assurer que les categories existent
+    const baseCatsSnap = await getDocs(baseCol('viticole','categories'));
+    const existCats = baseCatsSnap.docs.map(d => d.data().nom);
+    const catsNeeded = [...new Set(PRODUITS_EXCEL.map(p => p.cat))];
+    for (const cn of catsNeeded) {
+      if (!existCats.includes(cn)) await addDoc(baseCol('viticole','categories'), {nom:cn});
+    }
+    // Importer les produits en evitant les doublons
+    const baseProdsSnap = await getDocs(baseCol('viticole','produits'));
+    const existProds = baseProdsSnap.docs.map(d => d.data().nom.toUpperCase());
+    let nb = 0;
+    for (const p of PRODUITS_EXCEL) {
+      if (!existProds.includes(p.nom.toUpperCase())) {
+        await addDoc(baseCol('viticole','produits'), p);
+        nb++;
+      }
+    }
+    loading(false);
+    toast(nb + ' produits importes, ' + (PRODUITS_EXCEL.length - nb) + ' doublons ignores');
+  } catch(e) {
+    loading(false);
+    toast('Erreur : ' + e.message, true);
+  }
+};
+
 window.resetBaseViticole = async function() {
   if (!confirm('Reinitialiser la base viticole avec les produits par defaut ? Les produits existants ne seront pas dupliques.')) return;
   loading(true);
