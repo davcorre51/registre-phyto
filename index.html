@@ -497,7 +497,9 @@ function confirm2(title, msg, cb) {
 // ── INIT ─────────────────────────────────────────────────────
 async function init() {
   loading(true);
-  // Ecoute exploitations
+  // Timeout securite : si Firebase ne repond pas en 10s, on cache le loading
+  const timeout = setTimeout(() => loading(false), 10000);
+  let firstLoad = true;
   onSnapshot(exploitsCol(), snap => {
     S.exploitations = snap.docs.map(d => ({id: d.id, ...d.data()}));
     if (!S.currentId && S.exploitations.length > 0) {
@@ -509,7 +511,13 @@ async function init() {
     }
     renderExploitations();
     updateTopbar();
-    loading(false);
+    // Ne cacher le loading qu'apres le premier snapshot
+    if (firstLoad) {
+      firstLoad = false;
+      clearTimeout(timeout);
+      // Attendre un peu que listenExploit charge les sous-collections
+      setTimeout(() => loading(false), 800);
+    }
   });
 }
 
