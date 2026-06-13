@@ -1288,7 +1288,7 @@ window.openPassageModal = function(pid) {
       '<label>Applicateur</label>' +
       '<select id="f-applicateur">' +
         '<option value="">— ' + (getEx()?getEx().nom:'Exploitation') + ' (par defaut) —</option>' +
-        S.applicateurs.map(a => {
+        (S.applicateurs||[]).map(a => {
           const expire = a.certiphytoDate && new Date(a.certiphytoDate) < new Date();
           return '<option value="' + a.id + '"' + (p&&p.applicateurId===a.id?' selected':'') + (expire?' style="color:var(--rouge);"':'') + '>' + a.nom + (expire?' ⚠ EXPIRE':'') + '</option>';
         }).join('') +
@@ -1613,7 +1613,7 @@ window.onExploitTypeChange = function() {
 function renderApplicateursSection() {
   const ex = getEx();
   if (!ex) return '';
-  const btype = (ex.type === 'agricole') ? 'agricole' : 'viticole';
+  if (!S.applicateurs) S.applicateurs = [];
   return '<div style="margin-top:14px;border-top:1px solid var(--gris-l);padding-top:14px;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
       '<div style="font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.5px;">Applicateurs / Prestataires</div>' +
