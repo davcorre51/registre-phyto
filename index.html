@@ -532,7 +532,6 @@ async function createDefaultExploit() {
 }
 
 function listenBase(type) {
-  // Arreter les anciens listeners base
   S.unsubBase.forEach(u => u());
   S.unsubBase = [];
   S.unsubBase.push(onSnapshot(baseCol(type,'produits'), snap => {
@@ -543,6 +542,11 @@ function listenBase(type) {
   S.unsubBase.push(onSnapshot(baseCol(type,'categories'), snap => {
     S.categories = snap.docs.map(d => ({id: d.id, ...d.data()}));
     S.categories.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
+  S.unsubBase.push(onSnapshot(baseCol(type,'applicateurs'), snap => {
+    S.applicateurs = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.applicateurs.sort((a,b) => a.nom.localeCompare(b.nom));
     render();
   }));
 }
@@ -1161,6 +1165,7 @@ function renderExploitations() {
         '<div>' +
           '<div class="exploit-nom">' + e.nom + '</div>' +
           '<div class="exploit-siret">SIRET : ' + (e.siret||'Non renseigne') + '</div>' +
+          '<div class="exploit-siret">Certiphyto : ' + (e.certiphyto||'-') + (e.certiphytoDate ? ' — valide jusqu'au ' + fmtDate(e.certiphytoDate) + (new Date(e.certiphytoDate) < new Date() ? ' <span style="color:var(--rouge);font-weight:700;">EXPIRE</span>' : '') : '') + '</div>' +
           (e.certiphyto ? '<div class="exploit-siret">Certiphyto : ' + e.certiphyto + '</div>' : '') +
         '</div>' +
         (e.id === S.currentId ? '<span class="badge badge-vert">Active</span>' : '') +
@@ -1175,6 +1180,8 @@ function renderExploitations() {
         '<button class="btn btn-icon edt" onclick="openExploitModal(\'' + e.id + '\')" title="Modifier">✏️</button>' +
         '<button class="btn btn-icon del" onclick="delExploit(\'' + e.id + '\',\'' + e.nom + '\')" title="Supprimer">🗑️</button>' +
       '</div>' +
+      // Section applicateurs uniquement pour l'exploitation active
+      (e.id === S.currentId ? renderApplicateursSection() : '') +
     '</div>'
   ).join('');
 }
@@ -1270,6 +1277,16 @@ window.openPassageModal = function(pid) {
     '<div class="section-title">Produits appliques</div>' +
     prodsHTML +
 
+    '<div class="form-group" style="margin-top:10px;">' +
+      '<label>Applicateur</label>' +
+      '<select id="f-applicateur">' +
+        '<option value="">— ' + (getEx()?getEx().nom:'Exploitation') + ' (par defaut) —</option>' +
+        S.applicateurs.map(a => {
+          const expire = a.certiphytoDate && new Date(a.certiphytoDate) < new Date();
+          return '<option value="' + a.id + '"' + (p&&p.applicateurId===a.id?' selected':'') + (expire?' style="color:var(--rouge);"':'') + '>' + a.nom + (expire?' ⚠ EXPIRE':'') + '</option>';
+        }).join('') +
+      '</select>' +
+    '</div>' +
     '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="f-notes" rows="2" placeholder="Conditions meteo...">' + (p?p.notes||'':'') + '</textarea></div>';
 
   openModal(p ? 'Modifier le passage' : 'Nouveau passage', body, () => savePassage(pid));
@@ -1318,6 +1335,9 @@ async function savePassage(pid) {
     prodsList.push({nom, cat, dose, qte: parseFloat(qte)||0, unite, dre: base ? base.dre : 0, amm: base ? base.amm||'' : ''});
   });
   const cultEl2 = document.getElementById('f-culture');
+  const appSel2 = document.getElementById('f-applicateur');
+  const appId2 = appSel2 ? appSel2.value : '';
+  const appObj = appId2 ? S.applicateurs.find(a => a.id === appId2) : null;
   const data = {
     num: parseInt(document.getElementById('f-num').value)||1,
     campagne: document.getElementById('f-camp').value || S.campagne,
@@ -1330,6 +1350,9 @@ async function savePassage(pid) {
     parcelles: parc,
     produitsList: prodsList,
 
+    applicateurId: appId2 || '',
+    applicateurNom: appObj ? appObj.nom : (getEx() ? getEx().nom : ''),
+    applicateurSiret: appObj ? appObj.siret||'' : (getEx() ? getEx().siret||'' : ''),
     notes: document.getElementById('f-notes').value,
     updatedAt: serverTimestamp()
   };
@@ -1526,6 +1549,7 @@ window.openExploitModal = function(eid) {
       '<div class="form-group full"><label>Raison sociale / Nom</label><input type="text" id="fe-nom" value="' + (e?e.nom:'') + '" placeholder="EI DUPONT Jean"></div>' +
       '<div class="form-group"><label>N SIRET (14 chiffres)</label><input type="text" id="fe-siret" maxlength="14" value="' + (e?e.siret||'':'') + '"></div>' +
       '<div class="form-group"><label>N Certiphyto</label><input type="text" id="fe-cert" value="' + (e?e.certiphyto||'':'') + '"></div>' +
+      '<div class="form-group"><label>Validite Certiphyto</label><input type="date" id="fe-certdate" value="' + (e?e.certiphytoDate||'':'') + '"></div>' +
       '<div class="form-group"><label>Surface totale (ha)</label><input type="number" id="fe-surf" step="0.01" value="' + (e?e.surface||'':'') + '"></div>' +
       '<div class="form-group"><label>Agriculture Biologique</label><select id="fe-ab"><option value="false"' + (e&&!e.ab?' selected':'') + '>Non</option><option value="true"' + (e&&e.ab?' selected':'') + '>Oui</option></select></div>' +
     '</div>' +
@@ -1537,7 +1561,7 @@ async function saveExploit(eid) {
   const nom = document.getElementById('fe-nom').value.trim();
   if (!nom) { toast('Nom requis', true); return; }
   const type = (document.getElementById('fe-type') ? document.getElementById('fe-type').value : null) || 'viticole';
-  const data = {nom, type, siret:document.getElementById('fe-siret').value, certiphyto:document.getElementById('fe-cert').value, surface:parseFloat(document.getElementById('fe-surf').value)||0, ab:document.getElementById('fe-ab').value==='true'};
+  const data = {nom, type, siret:document.getElementById('fe-siret').value, certiphyto:document.getElementById('fe-cert').value, certiphytoDate:document.getElementById('fe-certdate').value||'', surface:parseFloat(document.getElementById('fe-surf').value)||0, ab:document.getElementById('fe-ab').value==='true'};
   try {
     if (eid) {
       await updateDoc(exploitDoc(eid), data);
@@ -1577,6 +1601,71 @@ window.onExploitTypeChange = function() {
   } else {
     info.textContent = 'Base produits phytosanitaires agricole partagee (commune a toutes les exploitations agricoles) + stades par culture (Ble, Orge, Colza, Tournesol, Mais).';
   }
+};
+
+function renderApplicateursSection() {
+  const ex = getEx();
+  if (!ex) return '';
+  const btype = (ex.type === 'agricole') ? 'agricole' : 'viticole';
+  return '<div style="margin-top:14px;border-top:1px solid var(--gris-l);padding-top:14px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
+      '<div style="font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.5px;">Applicateurs / Prestataires</div>' +
+      '<button class="btn btn-primary btn-sm" onclick="openApplicateurModal(null)">+ Ajouter</button>' +
+    '</div>' +
+    (S.applicateurs.length === 0 ?
+      '<div style="font-size:12px;color:var(--gris);opacity:.6;">Aucun prestataire — l exploitation elle-meme est applicateur par defaut.</div>' :
+      '<div style="display:flex;flex-direction:column;gap:6px;">' +
+      S.applicateurs.map(a => {
+        const expire = a.certiphytoDate && new Date(a.certiphytoDate) < new Date();
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--gris-l);border-radius:var(--r-sm);">' +
+          '<div>' +
+            '<div style="font-weight:600;font-size:13px;">' + a.nom + (expire ? ' <span style="color:var(--rouge);font-size:11px;">⚠ Certiphyto expire</span>' : '') + '</div>' +
+            '<div style="font-size:11px;color:var(--gris);">SIRET : ' + (a.siret||'-') + ' &nbsp;·&nbsp; Certiphyto : ' + (a.certiphyto||'-') + (a.certiphytoDate ? ' (val. ' + fmtDate(a.certiphytoDate) + ')' : '') + '</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:4px;">' +
+            '<button class="btn btn-icon edt" onclick="openApplicateurModal(\'' + a.id + '\')" title="Modifier">✏️</button>' +
+            '<button class="btn btn-icon del" onclick="delApplicateur(\'' + a.id + '\',\'' + a.nom + '\')" title="Supprimer">🗑️</button>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+      '</div>'
+    ) +
+  '</div>';
+}
+
+// ── MODAL APPLICATEUR ──
+window.openApplicateurModal = function(aid) {
+  const a = aid ? S.applicateurs.find(x => x.id === aid) : null;
+  const body =
+    '<div class="form-grid">' +
+      '<div class="form-group full"><label>Nom du prestataire *</label><input type="text" id="fa-nom" value="' + (a?a.nom:'') + '" placeholder="ex: EARL DUPONT"></div>' +
+      '<div class="form-group"><label>N SIRET (14 chiffres)</label><input type="text" id="fa-siret" maxlength="14" value="' + (a?a.siret||'':'') + '"></div>' +
+      '<div class="form-group"><label>N Certiphyto</label><input type="text" id="fa-cert" value="' + (a?a.certiphyto||'':'') + '"></div>' +
+      '<div class="form-group full"><label>Date de validite Certiphyto</label><input type="date" id="fa-certdate" value="' + (a?a.certiphytoDate||'':'') + '"></div>' +
+    '</div>';
+  openModal(a ? 'Modifier l applicateur' : 'Nouvel applicateur', body, () => saveApplicateur(aid));
+};
+
+async function saveApplicateur(aid) {
+  const nom = document.getElementById('fa-nom').value.trim();
+  if (!nom) { toast('Nom requis', true); return; }
+  const ex = getEx();
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  const data = {nom, siret:document.getElementById('fa-siret').value, certiphyto:document.getElementById('fa-cert').value, certiphytoDate:document.getElementById('fa-certdate').value||''};
+  try {
+    if (aid) await setDoc(baseDoc(btype,'applicateurs',aid), data, {merge:true});
+    else await addDoc(baseCol(btype,'applicateurs'), data);
+    closeModal(); toast('Applicateur enregistre');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+window.delApplicateur = function(id, nom) {
+  confirm2('Supprimer "' + nom + '" ?', 'Cet applicateur sera retire de la liste. Les passages existants ne sont pas modifies.', async () => {
+    const ex = getEx();
+    const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+    await deleteDoc(baseDoc(btype,'applicateurs',id));
+    toast('Applicateur supprime');
+  });
 };
 
 window.switchExploit = function(id) {
@@ -1624,6 +1713,11 @@ window.exportExcel = function() {
     rows.push([]);
   });
 
+  // Ligne applicateur si prestataire externe
+  const hasExterne = passages.some(p => p.applicateurId);
+  if (hasExterne) {
+    rows.push(['Applicateur','','','', ...passages.map(p => [p.applicateurId ? (p.applicateurNom||'') : '', p.applicateurId ? (p.applicateurSiret||'') : '', '']).flat()]);
+  }
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(rows);
   ws['!cols'] = [{wch:22},{wch:8},{wch:8},{wch:14},...Array(Math.max(passages.length,1)*3).fill({wch:14})];
@@ -1636,7 +1730,7 @@ window.exportExcel = function() {
 
 window.exportCSV = function() {
   const ex = getEx();
-  const header = ['N Ilot','N Parcelle','Code commune','GPS','Culture','Label AB','Nom produit','N AMM','Date','Dose','Surface','Mode','H debut','H fin','Cible','DRE','Stade','Applicateur','SIRET'];
+  const header = ['N Ilot','N Parcelle','Code commune','GPS','Culture','Label AB','Nom produit','N AMM','Date','Quantite','Unite','Surface','Mode','H debut','H fin','Cible','DRE','Stade','Applicateur','SIRET applicateur'];
   const rows = [header];
   const expSelCSV = document.getElementById('export-campagne');
   const campagneCSV = (expSelCSV ? expSelCSV.value : null) || S.campagne;
