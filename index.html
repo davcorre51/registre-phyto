@@ -1165,8 +1165,7 @@ function renderExploitations() {
         '<div>' +
           '<div class="exploit-nom">' + e.nom + '</div>' +
           '<div class="exploit-siret">SIRET : ' + (e.siret||'Non renseigne') + '</div>' +
-          '<div class="exploit-siret">Certiphyto : ' + (e.certiphyto||'-') + (e.certiphytoDate ? ' — valide jusqu'au ' + fmtDate(e.certiphytoDate) + (new Date(e.certiphytoDate) < new Date() ? ' <span style="color:var(--rouge);font-weight:700;">EXPIRE</span>' : '') : '') + '</div>' +
-          (e.certiphyto ? '<div class="exploit-siret">Certiphyto : ' + e.certiphyto + '</div>' : '') +
+          '<div class="exploit-siret">Certiphyto : ' + (e.certiphyto||'-') + (e.certiphytoDate ? ' &mdash; val. ' + fmtDate(e.certiphytoDate) + (new Date(e.certiphytoDate) < new Date() ? ' <span style="color:var(--rouge);font-weight:700;">EXPIRE</span>' : '') : '') + '</div>' +
         '</div>' +
         (e.id === S.currentId ? '<span class="badge badge-vert">Active</span>' : '') +
       '</div>' +
@@ -1643,7 +1642,7 @@ window.openApplicateurModal = function(aid) {
       '<div class="form-group"><label>N Certiphyto</label><input type="text" id="fa-cert" value="' + (a?a.certiphyto||'':'') + '"></div>' +
       '<div class="form-group full"><label>Date de validite Certiphyto</label><input type="date" id="fa-certdate" value="' + (a?a.certiphytoDate||'':'') + '"></div>' +
     '</div>';
-  openModal(a ? 'Modifier l applicateur' : 'Nouvel applicateur', body, () => saveApplicateur(aid));
+  openModal(a ? 'Modifier applicateur' : 'Nouvel applicateur', body, () => saveApplicateur(aid));
 };
 
 async function saveApplicateur(aid) {
