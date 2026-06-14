@@ -901,11 +901,18 @@ function updateCampagneSelector() {
   if (!years.includes(cur)) years.unshift(cur);
   // Ne pas ecraser S.campagne si elle est deja definie (meme sans passages)
   if (!S.campagne) S.campagne = years[0] || cur;
-  // Ajouter S.campagne a la liste si absente (nouvelle campagne vide)
-  if (!years.includes(S.campagne)) years.unshift(S.campagne);
+  // Ajouter S.campagne a la liste si absente
+  if (!years.includes(S.campagne)) {
+    // Si la campagne courante n'a pas de passages, ajouter quand meme
+    years.unshift(S.campagne);
+  }
   years.sort().reverse();
   const sel = document.getElementById('campagne-select');
-  if (sel) sel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === S.campagne ? ' selected' : '') + '>' + y + '</option>').join('');
+  if (sel) {
+    sel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === S.campagne ? ' selected' : '') + '>' + y + '</option>').join('');
+    // S'assurer que S.campagne correspond bien à la valeur sélectionnée
+    if (sel.value) S.campagne = sel.value;
+  }
   // Synchroniser le select export
   const expSel = document.getElementById('export-campagne');
   if (expSel) expSel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === S.campagne ? ' selected' : '') + '>' + y + '</option>').join('');
@@ -1355,7 +1362,7 @@ async function savePassage(pid) {
     heureDebut: document.getElementById('f-hdeb').value,
     heureFin: document.getElementById('f-hfin').value,
     stade: document.getElementById('f-stade').value,
-    dre: document.getElementById('f-dre').value,
+    dre: parseInt(document.getElementById('f-dre').value)||0,
     parcelles: parc,
     produitsList: prodsList,
 
