@@ -1759,7 +1759,7 @@ window.exportCSV = function() {
     (p.produitsList||[]).forEach(pr => {
       (p.parcelles||['']).forEach(parc => {
         const pi = S.parcelles.find(pa=>pa.nom===parc)||{};
-        rows.push([pi.ilot||'',parc,pi.commune||'',pi.gps||'','Vigne',ex.ab?'Oui':'Non',pr.nom,pr.amm||'',fmtDate(p.date),pr.dose||'',pi.surface||'','Plein air',p.heureDebut||'',p.heureFin||'',pr.cat,pr.dre||'',p.stade||'',ex.nom,ex.siret||'']);
+        rows.push([pi.ilot||'',parc,pi.commune||'',pi.gps||'','Vigne',ex.ab?'Oui':'Non',pr.nom,pr.amm||'',fmtDate(p.date),(pr.qte ? pr.qte+' '+(pr.unite||'') : pr.dose||''),pi.surface||'','Plein air',p.heureDebut||'',p.heureFin||'',pr.cat,parseInt(pr.dre)||'',p.stade||'',p.applicateurNom||ex.nom,'='+JSON.stringify(String(p.applicateurSiret||ex.siret||''))]);
       });
     });
   });
