@@ -888,6 +888,14 @@ function listenExploit() {
     S.cultures.sort((a,b) => a.nom.localeCompare(b.nom));
   }));
 
+  // Dates de récolte par campagne (propres à l'exploitation)
+  S.unsubs.push(onSnapshot(sub(eid,'campagnes'), snap => {
+    S.datesRecolte = {};
+    snap.docs.forEach(d => {
+      if (d.data().dateRecolte) S.datesRecolte[d.id] = d.data().dateRecolte;
+    });
+    updateExportRecolteField();
+  }));
   // Produits et categories : base commune selon type exploitation
   const ex = S.exploitations.find(e => e.id === eid);
   const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
@@ -1739,8 +1747,7 @@ window.delApplicateur = function(id, nom) {
 window.switchExploit = function(id) {
   if (id === S.currentId) return;
   S.currentId = id;
-  S.datesRecolte = {}; // Reset avant chargement nouvelle exploitation
-  updateExportRecolteField();
+  S.datesRecolte = {}; // Reset en memoire, Firebase va repeupler via listener
   listenExploit();
   toast('Exploitation activee');
 };
