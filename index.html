@@ -1115,6 +1115,26 @@ function recalcDRE() {
   if (field) field.value = maxDre;
 }
 
+window.insertGPSNotes = function() {
+  const checks = document.querySelectorAll('.parc-cb:checked');
+  const gpsLines = [];
+  checks.forEach(cb => {
+    const parc = S.parcelles.find(p => p.nom === cb.value);
+    if (parc && parc.gps) gpsLines.push(parc.nom + ' : ' + parc.gps);
+  });
+  if (!gpsLines.length) {
+    toast('Aucune coordonnee GPS sur les parcelles selectionnees', true);
+    return;
+  }
+  const notes = document.getElementById('f-notes');
+  if (!notes) return;
+  const existing = notes.value.trim();
+  const gpsText = 'GPS : ' + gpsLines.join(' | ');
+  notes.value = existing ? existing + '\n' + gpsText : gpsText;
+  toast('GPS inseres dans les notes');
+};
+
+
 window.selectAllParcelles = function(checked) {
   document.querySelectorAll('.parc-cb').forEach(cb => cb.checked = checked);
 };
