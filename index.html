@@ -929,15 +929,22 @@ window.onCampagneChange = function() {
 function updateExportRecolteField() {
   const el = document.getElementById('export-recolte');
   if (!el) return;
-  const camp = (document.getElementById('export-campagne') ? document.getElementById('export-campagne').value : null) || S.campagne;
-  el.value = S.datesRecolte[camp] || '';
+  if (!S.datesRecolte) S.datesRecolte = {};
+  const camp = (document.getElementById('export-campagne') ? document.getElementById('export-campagne').value : null) || S.campagne || '';
+  if (camp) el.value = S.datesRecolte[camp] || '';
 }
 
-async function saveExportRecolte(val) {
+window.saveExportRecolte = async function(val) {
   if (!S.currentId) return;
-  const camp = (document.getElementById('export-campagne') ? document.getElementById('export-campagne').value : null) || S.campagne;
-  await setDoc(doc(db, 'exploitations', S.currentId, 'campagnes', camp), {dateRecolte: val}, {merge: true});
-}
+  if (!S.datesRecolte) S.datesRecolte = {};
+  const camp = (document.getElementById('export-campagne') ? document.getElementById('export-campagne').value : null) || S.campagne || '';
+  if (!camp) return;
+  S.datesRecolte[camp] = val;
+  try {
+    await setDoc(doc(db, 'exploitations', S.currentId, 'campagnes', camp), {dateRecolte: val}, {merge: true});
+    toast('Date de recolte enregistree');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+};
 
 function updateExportResume() {
   const el = document.getElementById('export-resume');
@@ -1726,7 +1733,7 @@ window.exportExcel = function() {
   const ex = getEx();
   const expSel = document.getElementById('export-campagne');
   const campagne = (expSel ? expSel.value : null) || S.campagne;
-  const dateRecolte = S.datesRecolte[campagne] || document.getElementById('export-recolte').value || '';
+  const dateRecolte = (S.datesRecolte && S.datesRecolte[campagne]) || document.getElementById('export-recolte').value || '';
   const passages = S.passages.filter(p => yearOf(p) === campagne).sort((a,b) => toISO(a.date)<toISO(b.date)?-1:1);
   const rows = [];
   rows.push(['Fiche enregistrement phytosanitaires']);
