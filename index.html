@@ -168,10 +168,10 @@ tr:hover td{background:var(--vert-xxl);}
 .prod-pills-section{margin-bottom:14px;}
 .prod-pills-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--vert);margin-bottom:8px;}
 .prod-pills-grid{display:flex;flex-wrap:wrap;gap:8px;}
-.prod-pill{display:flex;align-items:center;gap:0;border-radius:50px;border:1.5px solid var(--gris-m);background:var(--blanc);overflow:hidden;transition:all .15s;cursor:pointer;}
-.prod-pill.active{border-color:var(--vert-l);background:var(--vert-xxl);}
+.prod-pill{display:flex;align-items:center;gap:0;border-radius:50px;border:2px solid var(--gris-m);background:var(--blanc);overflow:hidden;transition:all .15s;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+.prod-pill.active{border-color:var(--vert);background:var(--vert-xl);box-shadow:0 2px 8px rgba(45,80,22,0.2);}
 .prod-pill-name{padding:8px 14px;font-size:13px;font-weight:500;color:var(--gris);user-select:none;}
-.prod-pill.active .prod-pill-name{color:var(--vert);font-weight:600;}
+.prod-pill.active .prod-pill-name{color:var(--vert);font-weight:700;}
 .prod-pill-dose{display:none;padding:5px 8px;background:var(--vert-xl);border-left:1.5px solid var(--vert-l);align-items:center;gap:4px;}
 .prod-pill.active .prod-pill-dose{display:flex;}
 .pill-qte{border:none;background:transparent;font-size:12px;color:var(--vert);font-weight:600;width:55px;outline:none;font-family:inherit;}
@@ -1025,7 +1025,7 @@ function renderPassages(cp) {
         '<div><div class="passage-date">' + fmtDate(p.date) + (p.heureDebut ? ' — ' + p.heureDebut : '') + '</div>' +
         '<div class="passage-meta">' + ((p.parcelles||[]).join(', ')||'Toutes parcelles') + '</div></div>' +
         '<div class="passage-right"><div style="font-size:11px;color:var(--gris);text-align:right;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.stade||'') + '</div>' +
-        '<div style="display:flex;gap:4px;">' + (function(){ var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre)||0);},0); return m?'<span class="badge badge-rouge">DRE '+m+'h</span>':''; })() + '</div></div>' +
+        '<div style="display:flex;gap:4px;">' + (function(){ var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},parseInt(p.dre,10)||0); return m?'<span class="badge badge-rouge">DRE '+m+'h</span>':''; })() + '</div></div>' +
       '</div>' +
       '<div class="passage-body" id="pb' + p.id + '">' + (bodyHTML || '<span style="font-size:12px;color:var(--gris);">Aucun produit saisi.</span>') +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
@@ -1711,7 +1711,7 @@ window.exportExcel = function() {
   const passages = S.passages.filter(p => yearOf(p) === campagne).sort((a,b) => toISO(a.date)<toISO(b.date)?-1:1);
   const rows = [];
   rows.push(['Fiche enregistrement phytosanitaires']);
-  rows.push(['Identification','','','',ex.nom,'','Date de recolte:', document.getElementById('export-recolte').value||'']);
+  rows.push(['Identification','','','',ex.nom,'','SIRET:', '\'' + (ex.siret||''),'Date de recolte:', document.getElementById('export-recolte').value||'']);
   rows.push(['Nbr. de passage','','','', ...passages.map((_,i) => [i+1,'','']).flat()]);
   rows.push(['Date de passage','','','', ...passages.map(p => [fmtDate(p.date),'','']).flat()]);
   rows.push(['DRE','','','', ...passages.map(p => [p.dre||48,'','']).flat()]);
@@ -1740,13 +1740,15 @@ window.exportExcel = function() {
   XLSX.utils.book_append_sheet(wb, ws, 'Traitements ' + campagne);
   const wsP = XLSX.utils.aoa_to_sheet([['Parcelle','Surface (ha)','Ilot','Commune','GPS'],...S.parcelles.map(p=>[p.nom,p.surface,p.ilot,p.commune,p.gps||''])]);
   XLSX.utils.book_append_sheet(wb, wsP, 'Parcelles');
+  // Forcer SIRET en texte
+  if (ws['H2']) { ws['H2'].t = 's'; ws['H2'].v = String(ex.siret||''); }
   XLSX.writeFile(wb, 'Registre_phyto_' + ex.nom.replace(/\s/g,'_') + '_' + campagne + '.xlsx');
   toast('Export Excel telecharge');
 };
 
 window.exportCSV = function() {
   const ex = getEx();
-  const header = ['N Ilot','N Parcelle','Code commune','GPS','Culture','Label AB','Nom produit','N AMM','Date','Quantite','Unite','Surface','Mode','H debut','H fin','Cible','DRE','Stade','Applicateur','SIRET applicateur'];
+  const header = ['N Ilot','N Parcelle','Code commune','GPS','Culture','Label AB','Nom produit','N AMM','Date','Quantite','Surface','Mode','H debut','H fin','Cible','DRE','Stade','Applicateur','SIRET applicateur'];
   const rows = [header];
   const expSelCSV = document.getElementById('export-campagne');
   const campagneCSV = (expSelCSV ? expSelCSV.value : null) || S.campagne;
