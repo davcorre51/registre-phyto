@@ -202,7 +202,7 @@ tr:hover td{background:var(--vert-xxl);}
     <div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;">🌿 PhytoRegistre</div>
     <h1 style="font-size:14px;font-weight:500;">Registre Phytosanitaire</h1>
   </div>
-  <select id="exploit-select" onchange="switchExploit(this.value)" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:white;border-radius:20px;padding:6px 12px;font-size:12px;font-family:inherit;max-width:170px;cursor:pointer;outline:none;"></select>
+  <select id="exploit-select" onchange="switchExploit(this.value)" style="background:var(--vert-m);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:20px;padding:6px 12px;font-size:12px;font-family:inherit;max-width:170px;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;"></select>
 </div>
 
 <div id="nav">
@@ -999,7 +999,7 @@ function renderDash(cp) {
     return;
   }
   const lastN = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).slice(0,15);
-  el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>N</th><th>Date</th><th>Stade</th><th>Produits</th><th>DRE</th></tr></thead><tbody>' +
+  el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>N</th><th>Date</th><th>Stade</th><th>DRE</th></tr></thead><tbody>' +
     lastN.map(p => '<tr><td><span class="badge badge-vert">' + (p.num||'-') + '</span></td><td>' + fmtDate(p.date) + '</td><td style="font-size:11px;max-width:110px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + (p.stade||'-') + '</td><td style="font-size:11px;">' + (p.produitsList||[]).slice(0,2).map(pr=>pr.nom).join(', ') + ((p.produitsList||[]).length>2?'...':'') + '</td><td><span class="badge badge-ocre">' + (parseFloat(p.ift)||0).toFixed(2) + '</span></td></tr>').join('') +
     '</tbody></table></div>';
 }
@@ -1025,7 +1025,7 @@ function renderPassages(cp) {
         '<div><div class="passage-date">' + fmtDate(p.date) + (p.heureDebut ? ' — ' + p.heureDebut : '') + '</div>' +
         '<div class="passage-meta">' + ((p.parcelles||[]).join(', ')||'Toutes parcelles') + '</div></div>' +
         '<div class="passage-right"><div style="font-size:11px;color:var(--gris);text-align:right;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.stade||'') + '</div>' +
-        '<div style="display:flex;gap:4px;">' + (function(){ var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},parseInt(p.dre,10)||0); return m?'<span class="badge badge-rouge">DRE '+m+'h</span>':''; })() + '</div></div>' +
+        '<div style="display:flex;gap:4px;">' + (function(){ var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; return v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; })() + '</div></div>' +
       '</div>' +
       '<div class="passage-body" id="pb' + p.id + '">' + (bodyHTML || '<span style="font-size:12px;color:var(--gris);">Aucun produit saisi.</span>') +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
