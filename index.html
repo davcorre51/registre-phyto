@@ -1772,44 +1772,80 @@ window.exportExcel = function() {
   const dateRecolte = (S.datesRecolte && S.datesRecolte[campagne]) || document.getElementById('export-recolte').value || '';
   const passages = S.passages.filter(p => yearOf(p) === campagne).sort((a,b) => toISO(a.date)<toISO(b.date)?-1:1);
   const rows = [];
-  rows.push(['Fiche enregistrement phytosanitaires']);
-  rows.push(['Identification','','','',ex.nom,'','SIRET:', "'" + (ex.siret||''),'Date de recolte:', dateRecolte]);
-  rows.push(['Nbr. de passage','','','', ...passages.map((_,i) => [i+1,'','']).flat()]);
-  rows.push(['Date de passage','','','', ...passages.map(p => [fmtDate(p.date),'','']).flat()]);
-  rows.push(['DRE','','','', ...passages.map(p => [p.dre||48,'','']).flat()]);
+
+  // ── EN-TETE EXPLOITATION ──
+  rows.push(['Fiche enregistrement phytosanitaires - Campagne ' + campagne]);
+  rows.push(['Identification', ex.nom]);
+  rows.push(['SIRET', {t:'s', v:String(ex.siret||'')}]);
+  if (ex.type !== 'agricole') rows.push(['Date de recolte', dateRecolte]);
+  rows.push([]); // ligne vide
+
+  // ── ENTETES PASSAGES (1 colonne par passage) ──
+  rows.push(['Nbr. de passage', ...passages.map((_,i) => i+1)]);
+  rows.push(['Date de passage', ...passages.map(p => fmtDate(p.date))]);
+  rows.push(['DRE (h)',         ...passages.map(p => parseInt(p.dre)||0)]);
+  rows.push(['Stade',           ...passages.map(p => p.stade||'')]);
+  rows.push(['Heure debut',     ...passages.map(p => p.heureDebut||'')]);
+  rows.push(['Heure fin',       ...passages.map(p => p.heureFin||'')]);
+  rows.push(['Parcelles',       ...passages.map(p => (p.parcelles||[]).join(', '))]);
   rows.push([]);
+
+  // ── PRODUITS PAR CATEGORIE ──
   const catNames = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(p=>p.cat)])];
   catNames.forEach(cat => {
-    const noms=[], doses=[];
+    // Trouver tous les produits distincts de cette catégorie utilisés dans les passages
+    const allProds = [];
     passages.forEach(p => {
-      const pp = (p.produitsList||[]).filter(pr=>pr.cat===cat);
-      noms.push(pp.map(pr=>pr.nom).join(' + ')||'','','');
-      doses.push(pp.map(pr=>pr.dose).join(' / ')||'','','');
+      (p.produitsList||[]).filter(pr=>pr.cat===cat).forEach(pr => {
+        if (!allProds.includes(pr.nom)) allProds.push(pr.nom);
+      });
     });
-    rows.push([cat,'','','Nom',...noms]);
-    rows.push(['','','','Qte',...doses]);
+    if (!allProds.length) return;
+    // En-tête catégorie
+    rows.push([cat.toUpperCase()]);
+    // Une ligne par produit
+    allProds.forEach(nomProd => {
+      const row = [nomProd];
+      passages.forEach(p => {
+        const pr = (p.produitsList||[]).find(pr => pr.nom === nomProd && pr.cat === cat);
+        row.push(pr ? (pr.qte ? pr.qte + ' ' + (pr.unite||'') : pr.dose||'') : '');
+      });
+      rows.push(row);
+    });
     rows.push([]);
   });
 
-  // Ligne notes en bas
+  // ── APPLICATEUR (si prestataire externe) ──
+  const hasExterne = passages.some(p => p.applicateurId);
+  if (hasExterne) {
+    rows.push(['Applicateur', ...passages.map(p => p.applicateurId ? (p.applicateurNom||'') : '')]);
+    rows.push(['SIRET applicateur', ...passages.map(p => p.applicateurId ? {t:'s',v:String(p.applicateurSiret||'')} : '')]);
+  }
+
+  // ── NOTES ──
   const hasNotes = passages.some(p => p.notes && p.notes.trim());
   if (hasNotes) {
     rows.push([]);
-    rows.push(['Notes / observations','','','', ...passages.map(p => [p.notes||'','','']).flat()]);
+    rows.push(['Notes', ...passages.map(p => p.notes||'')]);
   }
-  // Ligne applicateur si prestataire externe
-  const hasExterne = passages.some(p => p.applicateurId);
-  if (hasExterne) {
-    rows.push(['Applicateur','','','', ...passages.map(p => [p.applicateurId ? (p.applicateurNom||'') : '', p.applicateurId ? (p.applicateurSiret||'') : '', '']).flat()]);
-  }
+
+  // ── WORKBOOK ──
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:22},{wch:8},{wch:8},{wch:14},...Array(Math.max(passages.length,1)*3).fill({wch:14})];
+  // Largeurs colonnes : col A=22, puis une par passage=16
+  ws['!cols'] = [{wch:22}, ...Array(Math.max(passages.length,1)).fill({wch:16})];
   XLSX.utils.book_append_sheet(wb, ws, 'Traitements ' + campagne);
-  const wsP = XLSX.utils.aoa_to_sheet([['Parcelle','Surface (ha)','Ilot','Commune','GPS'],...S.parcelles.map(p=>[p.nom,p.surface,p.ilot,p.commune,p.gps||''])]);
+
+  // ── ONGLET PARCELLES ──
+  const parcRows = [];
+  parcRows.push([ex.nom, '', 'SIRET:', {t:'s',v:String(ex.siret||'')}]);
+  parcRows.push([]);
+  parcRows.push(['Parcelle','Surface (ha)','Ilot','Commune INSEE','Ville','GPS']);
+  S.parcelles.forEach(p => parcRows.push([p.nom, p.surface||'', p.ilot||'', p.commune||'', p.ville||'', p.gps||'']));
+  const wsP = XLSX.utils.aoa_to_sheet(parcRows);
+  wsP['!cols'] = [{wch:20},{wch:12},{wch:10},{wch:14},{wch:16},{wch:20}];
   XLSX.utils.book_append_sheet(wb, wsP, 'Parcelles');
-  // Forcer SIRET en texte
-  if (ws['H2']) { ws['H2'].t = 's'; ws['H2'].v = String(ex.siret||''); }
+
   XLSX.writeFile(wb, 'Registre_phyto_' + ex.nom.replace(/\s/g,'_') + '_' + campagne + '.xlsx');
   toast('Export Excel telecharge');
 };
