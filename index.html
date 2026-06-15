@@ -1798,6 +1798,8 @@ window.exportExcel = function() {
       noms.push(pp.map(pr => pr.nom).join(' + ') || '');
       doses.push(pp.map(pr => pr.qte ? pr.qte + ' ' + (pr.unite||'') : (pr.dose||'')).join(' / ') || '');
     });
+    // Ligne vide avant chaque categorie (comme fichier original)
+    rows.push([]);
     rows.push([cat, 'Nom', ...noms]);
     rows.push(['',   'Qte', ...doses]);
   });
