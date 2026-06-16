@@ -1836,6 +1836,58 @@ window.exportExcel = function() {
   wsP['!cols'] = [{wch:14},{wch:22},{wch:20},{wch:12},{wch:10},{wch:40}];
   XLSX.utils.book_append_sheet(wb, wsP, 'Parcelles');
 
+  // ── ONGLET PRODUITS ──
+  // Collecter tous les produits distincts utilisés dans la campagne, par catégorie
+  const prodsUtilises = {}; // {cat: [{nom, amm}]}
+  passages.forEach(p => {
+    (p.produitsList||[]).forEach(pr => {
+      if (!prodsUtilises[pr.cat]) prodsUtilises[pr.cat] = [];
+      const exists = prodsUtilises[pr.cat].find(x => x.nom === pr.nom);
+      if (!exists) {
+        const base = S.produits.find(b => b.nom === pr.nom && b.cat === pr.cat);
+        prodsUtilises[pr.cat].push({nom: pr.nom, amm: (base && base.amm) ? base.amm : (pr.amm||'')});
+      }
+    });
+  });
+
+  // Structure : catégories en colonnes (3 colonnes par cat : Produits | AMM | vide)
+  const cats = Object.keys(prodsUtilises).sort();
+  const prodRows = [];
+
+  // Ligne titre
+  prodRows.push(['Produits utilises sur la campagne ' + campagne]);
+  prodRows.push(['Identification', ex.nom]);
+  prodRows.push(['SIRET:', {t:'s', v:String(ex.siret||'')}]);
+  prodRows.push([]);
+
+  // Ligne catégories
+  const catHeaderRow = [];
+  cats.forEach(cat => { catHeaderRow.push(cat, '', ''); });
+  prodRows.push(catHeaderRow);
+
+  // Ligne sous-entetes Produits / AMM
+  const subHeaderRow = [];
+  cats.forEach(() => { subHeaderRow.push('Produits', 'AMM', ''); });
+  prodRows.push(subHeaderRow);
+
+  // Lignes produits : autant de lignes que le max de produits dans une catégorie
+  const maxProds = Math.max(...cats.map(cat => prodsUtilises[cat].length), 0);
+  for (let i = 0; i < maxProds; i++) {
+    const row = [];
+    cats.forEach(cat => {
+      const prod = prodsUtilises[cat][i];
+      row.push(prod ? prod.nom : '', prod ? {t:'s',v:String(prod.amm||'')} : '', '');
+    });
+    prodRows.push(row);
+  }
+
+  const wsProd = XLSX.utils.aoa_to_sheet(prodRows);
+  // Largeur colonnes : 3 colonnes par catégorie (Produit=20, AMM=12, sep=2)
+  const prodCols = [];
+  cats.forEach(() => { prodCols.push({wch:22}, {wch:12}, {wch:2}); });
+  wsProd['!cols'] = prodCols;
+  XLSX.utils.book_append_sheet(wb, wsProd, 'Produits ' + campagne);
+
   XLSX.writeFile(wb, 'Registre_phyto_' + ex.nom.replace(/\s/g,'_') + '_' + campagne + '.xlsx');
   toast('Export Excel telecharge');
 };
