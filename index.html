@@ -295,6 +295,11 @@ tr:hover td{background:var(--vert-xxl);}
       </div>
     </div>
     <div class="card">
+      <div class="card-title">Sauvegarde de secours</div>
+      <div style="font-size:13px;color:var(--gris-d);margin-bottom:12px;">Telecharge une copie brute et complete de toutes les donnees (exploitations, passages, parcelles, produits...) au format JSON. A faire avant toute manipulation importante.</div>
+      <button class="btn btn-secondary" onclick="exportSauvegardeJSON()">Telecharger la sauvegarde complete (JSON)</button>
+    </div>
+    <div class="card">
       <div class="card-title">Mentions reglementaires 2026</div>
       <table>
         <tr><td style="font-weight:600;color:var(--vert);padding:6px 10px;white-space:nowrap;">Arrete applicable</td><td style="padding:6px 10px;">24 decembre 2025</td></tr>
@@ -339,7 +344,7 @@ tr:hover td{background:var(--vert-xxl);}
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -1791,6 +1796,49 @@ window.delExploit = function(id, nom) {
 };
 
 // ── EXPORT ───────────────────────────────────────────────────
+window.exportSauvegardeJSON = async function() {
+  try {
+    toast('Preparation de la sauvegarde...');
+    const dump = { genereLe: new Date().toISOString(), exploitations: [], bases: {} };
+
+    // Toutes les exploitations + leurs sous-collections
+    const expSnap = await getDocs(exploitsCol());
+    for (const expDoc of expSnap.docs) {
+      const eid = expDoc.id;
+      const exData = { id: eid, ...expDoc.data() };
+      for (const sousColl of ['passages', 'parcelles', 'cultures', 'campagnes']) {
+        const sSnap = await getDocs(sub(eid, sousColl));
+        exData[sousColl] = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+      dump.exploitations.push(exData);
+    }
+
+    // Bases communes (viticole + agricole)
+    for (const type of ['viticole', 'agricole']) {
+      dump.bases[type] = {};
+      for (const nom of ['produits', 'categories', 'applicateurs']) {
+        const bSnap = await getDocs(baseCol(type, nom));
+        dump.bases[type][nom] = bSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+    }
+
+    const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `sauvegarde-registre-phyto-${today}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Sauvegarde telechargee');
+  } catch (e) {
+    console.error('Erreur sauvegarde JSON', e);
+    toast('Erreur lors de la sauvegarde', true);
+  }
+};
+
 window.exportExcel = function() {
   const ex = getEx();
   const expSel = document.getElementById('export-campagne');
