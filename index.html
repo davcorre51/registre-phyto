@@ -251,12 +251,14 @@ tr:hover td{background:var(--vert-xxl);}
   <div id="page-produits" class="page">
     <div class="page-header">
       <h2>Base de produits</h2>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-secondary btn-sm" onclick="openCatModal()">+ Categorie</button>
-        <button class="btn btn-primary btn-sm" onclick="openProduitModal(null,null)">+ Produit</button>
-      </div>
+      <div style="display:flex;gap:8px;" id="produits-actions"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <div class="tab active" id="subtab-phyto" onclick="showProduitsView('phyto')" style="border-radius:50px;padding:8px 16px;">Produits phyto</div>
+      <div class="tab" id="subtab-engrais" onclick="showProduitsView('engrais')" style="border-radius:50px;padding:8px 16px;">Engrais</div>
     </div>
     <div id="produits-sections"></div>
+    <div id="engrais-sections" style="display:none;"></div>
   </div>
 
   <!-- PARCELLES -->
@@ -446,6 +448,8 @@ const S = {
   campagne: String(new Date().getFullYear()),
   passages: [],
   produits: [],      // depuis base commune
+  engrais: [],       // depuis base commune (fertilisation)
+  produitsView: 'phyto',
   categories: [],    // depuis base commune
   parcelles: [],     // propre a l'exploitation
   cultures: [],      // propre a l'exploitation (agricole)
@@ -588,6 +592,11 @@ function listenBase(type) {
   S.unsubBase.push(onSnapshot(baseCol(type,'applicateurs'), snap => {
     S.applicateurs = snap.docs.map(d => ({id: d.id, ...d.data()}));
     S.applicateurs.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
+  S.unsubBase.push(onSnapshot(baseCol(type,'engrais'), snap => {
+    S.engrais = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.engrais.sort((a,b) => a.nom.localeCompare(b.nom));
     render();
   }));
 }
@@ -1055,6 +1064,8 @@ function render() {
   renderDash(cp);
   renderPassages(cp);
   renderProduits();
+  renderEngrais();
+  updateProduitsActions();
   renderParcelles();
   renderExploitations();
 }
@@ -1216,6 +1227,109 @@ function renderProduits() {
   }).join('');
 }
 
+window.showProduitsView = function(view) {
+  document.getElementById('subtab-phyto').classList.toggle('active', view==='phyto');
+  document.getElementById('subtab-engrais').classList.toggle('active', view==='engrais');
+  document.getElementById('produits-sections').style.display = view==='phyto' ? '' : 'none';
+  document.getElementById('engrais-sections').style.display = view==='engrais' ? '' : 'none';
+  S.produitsView = view;
+  updateProduitsActions();
+};
+
+function updateProduitsActions() {
+  const el = document.getElementById('produits-actions');
+  if (!el) return;
+  if (S.produitsView === 'engrais') {
+    el.innerHTML = '<button class="btn btn-primary btn-sm" onclick="openEngraisModal(null)">+ Engrais</button>';
+  } else {
+    el.innerHTML = '<button class="btn btn-secondary btn-sm" onclick="openCatModal()">+ Categorie</button>' +
+                    '<button class="btn btn-primary btn-sm" onclick="openProduitModal(null,null)">+ Produit</button>';
+  }
+}
+
+const CATS_ENGRAIS = ['NPK','Azote seul','Oligo-elements / Foliaire','Amendement organique','Amendement calcique','Autre'];
+
+function renderEngrais() {
+  const el = document.getElementById('engrais-sections');
+  if (!el) return;
+  if (!S.engrais.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🌾</div><div class="empty-text">Aucun engrais enregistre</div></div>';
+    return;
+  }
+  const cats = [...new Set(S.engrais.map(e => e.categorie || 'Autre'))];
+  el.innerHTML = cats.map(cat => {
+    const prods = S.engrais.filter(e => (e.categorie||'Autre') === cat);
+    return '<div class="produits-cat-section">' +
+      '<div class="produits-cat-header"><span class="produits-cat-name">' + cat + '</span><span style="font-size:11px;color:var(--gris);">' + prods.length + ' produit(s)</span></div>' +
+      '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose habituelle</th><th>Composition</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
+      prods.map(e => {
+        const compo = ['n','p','k','mgo','so3','fe'].map(k => (e.composition && e.composition[k]) ? k.toUpperCase()+':'+e.composition[k] : null).filter(Boolean).join(' / ') || '-';
+        return '<tr><td style="font-weight:600;">' + e.nom + '</td><td>' + (e.qte ? e.qte+' '+(e.unite||'') : (e.dose||'-')) + '</td><td style="font-size:12px;">' + compo + '</td>' +
+          '<td><div class="td-actions"><button class="btn btn-icon edt" onclick="openEngraisModal(\'' + e.id + '\')" title="Modifier">✏️</button><button class="btn btn-icon del" onclick="delEngrais(\'' + e.id + '\',\'' + e.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>';
+      }).join('') +
+      '</tbody></table></div></div>';
+  }).join('');
+}
+
+window.openEngraisModal = function(eid) {
+  const e = eid ? S.engrais.find(x => x.id === eid) : null;
+  const c = (e && e.composition) || {};
+  const body =
+    '<div class="form-grid">' +
+      '<div class="form-group full"><label>Nom commercial</label><input type="text" id="fe-nom" value="' + (e?e.nom:'') + '" placeholder="ORGATEK" style="text-transform:uppercase;"></div>' +
+      '<div class="form-group"><label>Categorie</label><select id="fe-cat">' +
+        CATS_ENGRAIS.map(cn => '<option value="' + cn + '"' + (e&&e.categorie===cn?' selected':'') + '>' + cn + '</option>').join('') +
+      '</select></div>' +
+      '<div class="form-group"><label>Dose habituelle</label><input type="number" id="fe-qte" step="0.01" value="' + (e?e.qte||'':'') + '" placeholder="ex: 1058"></div>' +
+      '<div class="form-group"><label>Unite</label><select id="fe-unite"><option value="kg/ha"' + (e&&e.unite==='kg/ha'?' selected':'') + '>kg/ha</option><option value="L/ha"' + (e&&e.unite==='L/ha'?' selected':'') + '>L/ha</option></select></div>' +
+    '</div>' +
+    '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--vert);margin:10px 0 6px;">Composition (% dans le produit)</div>' +
+    '<div class="form-grid">' +
+      '<div class="form-group"><label>N (azote)</label><input type="number" id="fe-n" step="0.1" value="' + (c.n||'') + '"></div>' +
+      '<div class="form-group"><label>P (P2O5)</label><input type="number" id="fe-p" step="0.1" value="' + (c.p||'') + '"></div>' +
+      '<div class="form-group"><label>K (K2O)</label><input type="number" id="fe-k" step="0.1" value="' + (c.k||'') + '"></div>' +
+      '<div class="form-group"><label>MgO</label><input type="number" id="fe-mgo" step="0.1" value="' + (c.mgo||'') + '"></div>' +
+      '<div class="form-group"><label>SO3 (soufre)</label><input type="number" id="fe-so3" step="0.1" value="' + (c.so3||'') + '"></div>' +
+      '<div class="form-group"><label>Fe (fer chelate)</label><input type="number" id="fe-fe" step="0.1" value="' + (c.fe||'') + '"></div>' +
+    '</div>';
+  openModal(e ? 'Modifier l\'engrais' : 'Nouvel engrais', body, () => saveEngrais(eid));
+};
+
+async function saveEngrais(eid) {
+  const nom = document.getElementById('fe-nom').value.toUpperCase().trim();
+  if (!nom) { toast('Nom requis', true); return; }
+  const qte = document.getElementById('fe-qte').value;
+  const unite = document.getElementById('fe-unite').value;
+  const data = {
+    nom, categorie: document.getElementById('fe-cat').value,
+    qte: parseFloat(qte)||0, unite, dose: qte ? (qte+' '+unite) : '',
+    composition: {
+      n: parseFloat(document.getElementById('fe-n').value)||0,
+      p: parseFloat(document.getElementById('fe-p').value)||0,
+      k: parseFloat(document.getElementById('fe-k').value)||0,
+      mgo: parseFloat(document.getElementById('fe-mgo').value)||0,
+      so3: parseFloat(document.getElementById('fe-so3').value)||0,
+      fe: parseFloat(document.getElementById('fe-fe').value)||0
+    }
+  };
+  const ex = getEx();
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  try {
+    if (eid) await setDoc(baseDoc(btype,'engrais',eid), data, {merge:true});
+    else await addDoc(baseCol(btype,'engrais'), data);
+    closeModal(); toast('Engrais enregistre');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+window.delEngrais = function(id, nom) {
+  confirm2('Supprimer "' + nom + '" ?', 'Cet engrais sera retire de la base commune. Les passages existants ne seront pas modifies.', async () => {
+    const ex = getEx();
+    const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+    await deleteDoc(baseDoc(btype,'engrais',id));
+    toast('Engrais supprime');
+  });
+};
+
 window.toggleCat = function(id) {
   const el = document.getElementById(id);
   if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
@@ -1338,6 +1452,41 @@ window.openPassageModal = function(pid) {
       '</div></div>';
   }).join('');
 
+  const engraisHTML = (function() {
+    if (!S.engrais.length) return '';
+    const cats = [...new Set(S.engrais.map(eg => eg.categorie || 'Autre'))];
+    const existingEng = p ? (p.engraisList||[]) : [];
+    return '<div class="section-title">Engrais appliques</div>' +
+      cats.map(cat => {
+        const catEngs = S.engrais.filter(eg => (eg.categorie||'Autre') === cat);
+        const existing = existingEng.filter(eg => (eg.categorie||'Autre') === cat);
+        return '<div class="prod-pills-section">' +
+          '<div class="prod-pills-title">' + cat + '</div>' +
+          '<div class="prod-pills-grid">' +
+          catEngs.map(eg => {
+            const sel = existing.find(e => e.nom === eg.nom);
+            const isActive = !!sel;
+            const selQte = sel ? sel.qte : eg.qte;
+            const selUnite = sel ? sel.unite : (eg.unite || 'kg/ha');
+            const c = eg.composition || {};
+            return '<div class="prod-pill eng-pill' + (isActive ? ' active' : '') + '" data-cat="' + cat + '" data-nom="' + eg.nom + '" ' +
+              'data-n="' + (c.n||0) + '" data-p="' + (c.p||0) + '" data-k="' + (c.k||0) + '" data-mgo="' + (c.mgo||0) + '" data-so3="' + (c.so3||0) + '" data-fe="' + (c.fe||0) + '" ' +
+              'onclick="window.togglePill(this)">' +
+              '<div class="prod-pill-name">' + eg.nom + '</div>' +
+              '<div class="prod-pill-dose" style="display:flex;align-items:center;gap:4px;">' +
+                '<input type="number" class="pill-qte" step="0.01" value="' + (selQte||'') + '" placeholder="qte" onclick="event.stopPropagation()" style="width:60px;">' +
+                '<select class="pill-unite" onclick="event.stopPropagation()" style="font-size:11px;padding:4px 5px;border:none;background:transparent;color:var(--vert);font-weight:600;cursor:pointer;">' +
+                  '<option value="kg/ha"' + (selUnite==='kg/ha'?' selected':'') + '>kg/ha</option>' +
+                  '<option value="L/ha"' + (selUnite==='L/ha'?' selected':'') + '>L/ha</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>';
+          }).join('') +
+          '</div></div>';
+      }).join('') +
+      '<div id="engrais-apports-resume" style="background:var(--vert-xxl);border-radius:var(--r-sm);padding:10px 14px;margin:8px 0 14px;font-size:12px;color:var(--vert);"></div>';
+  })();
+
   const body =
     '<div class="form-grid" style="margin-bottom:12px;">' +
       '<div class="form-group"><label>Passage N</label><input type="number" id="f-num" value="' + (p ? p.num : cpPassages().length+1) + '" min="1"></div>' +
@@ -1382,6 +1531,7 @@ window.openPassageModal = function(pid) {
     '</div>' +
     '<div class="section-title">Produits appliques</div>' +
     prodsHTML +
+    engraisHTML +
 
     '<div class="form-group" style="margin-top:10px;">' +
       '<label>Applicateur</label>' +
@@ -1441,6 +1591,25 @@ async function savePassage(pid) {
     const dose = qte ? (qte + ' ' + unite) : '';
     prodsList.push({nom, cat, dose, qte: parseFloat(qte)||0, unite, dre: base ? base.dre : 0, amm: base ? base.amm||'' : ''});
   });
+  const engList = [];
+  document.querySelectorAll('.eng-pill.active').forEach(pill => {
+    const nom = pill.dataset.nom;
+    const cat = pill.dataset.cat;
+    const qteEl = pill.querySelector('.pill-qte');
+    const uniteEl = pill.querySelector('.pill-unite');
+    const qte = parseFloat(qteEl ? qteEl.value : 0) || 0;
+    const unite = uniteEl ? uniteEl.value : 'kg/ha';
+    const compoPct = {
+      n: parseFloat(pill.dataset.n)||0, p: parseFloat(pill.dataset.p)||0,
+      k: parseFloat(pill.dataset.k)||0, mgo: parseFloat(pill.dataset.mgo)||0,
+      so3: parseFloat(pill.dataset.so3)||0, fe: parseFloat(pill.dataset.fe)||0
+    };
+    // Apport reel (kg/ha) = dose appliquee x % de composition / 100.
+    // Hypothese : 1 L/ha ~ 1 kg/ha (densite proche de 1 pour la plupart des solutions engrais).
+    const apportsCalcules = {};
+    Object.keys(compoPct).forEach(k => { apportsCalcules[k] = Math.round(qte * compoPct[k] / 100 * 100) / 100; });
+    engList.push({nom, categorie: cat, qte, unite, composition: compoPct, apportsCalcules});
+  });
   const cultEl2 = document.getElementById('f-culture');
   const appSel2 = document.getElementById('f-applicateur');
   const appId2 = appSel2 ? appSel2.value : '';
@@ -1456,6 +1625,7 @@ async function savePassage(pid) {
     dre: parseInt(document.getElementById('f-dre').value)||0,
     parcelles: parc,
     produitsList: prodsList,
+    engraisList: engList,
 
     applicateurId: appId2 || '',
     applicateurNom: appObj ? appObj.nom : (getEx() ? getEx().nom : ''),
@@ -1816,7 +1986,7 @@ window.exportSauvegardeJSON = async function() {
     // Bases communes (viticole + agricole)
     for (const type of ['viticole', 'agricole']) {
       dump.bases[type] = {};
-      for (const nom of ['produits', 'categories', 'applicateurs']) {
+      for (const nom of ['produits', 'categories', 'applicateurs', 'engrais']) {
         const bSnap = await getDocs(baseCol(type, nom));
         dump.bases[type][nom] = bSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       }
@@ -1961,6 +2131,34 @@ window.exportExcel = function() {
   cats.forEach(() => { prodCols.push({wch:22}, {wch:12}, {wch:2}); });
   wsProd['!cols'] = prodCols;
   XLSX.utils.book_append_sheet(wb, wsProd, 'Produits ' + campagne);
+
+  // ── ONGLET ENGRAIS ──
+  const passagesEng = passages.filter(p => (p.engraisList||[]).length);
+  if (passagesEng.length) {
+    const engRows = [];
+    engRows.push(['Fertilisation ' + campagne]);
+    engRows.push(['Identification', ex.nom]);
+    engRows.push(['SIRET:', {t:'s', v:String(ex.siret||'')}]);
+    engRows.push([]);
+    engRows.push(['Date','Parcelles','Produit','Categorie','Dose','N (kg/ha)','P (kg/ha)','K (kg/ha)','MgO (kg/ha)','SO3 (kg/ha)','Fe (kg/ha)']);
+    const totaux = {n:0,p:0,k:0,mgo:0,so3:0,fe:0};
+    passagesEng.forEach(p => {
+      (p.engraisList||[]).forEach(e => {
+        const a = e.apportsCalcules || {};
+        engRows.push([
+          fmtDate(p.date), (p.parcelles||[]).join(' / '), e.nom, e.categorie||'',
+          (e.qte||0) + ' ' + (e.unite||''),
+          a.n||0, a.p||0, a.k||0, a.mgo||0, a.so3||0, a.fe||0
+        ]);
+        ['n','p','k','mgo','so3','fe'].forEach(k => { totaux[k] += a[k]||0; });
+      });
+    });
+    engRows.push([]);
+    engRows.push(['Total apports campagne', '', '', '', '', totaux.n, totaux.p, totaux.k, totaux.mgo, totaux.so3, totaux.fe]);
+    const wsEng = XLSX.utils.aoa_to_sheet(engRows);
+    wsEng['!cols'] = [{wch:12},{wch:24},{wch:18},{wch:16},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10}];
+    XLSX.utils.book_append_sheet(wb, wsEng, 'Engrais ' + campagne);
+  }
 
   XLSX.writeFile(wb, 'Registre_phyto_' + ex.nom.replace(/\s/g,'_') + '_' + campagne + '.xlsx');
   toast('Export Excel telecharge');
