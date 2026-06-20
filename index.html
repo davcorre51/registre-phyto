@@ -340,6 +340,7 @@ tr:hover td{background:var(--vert-xxl);}
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARkXeCqBH2lSbfG_YsTuMJfY6NtUrwosg",
@@ -352,6 +353,22 @@ const firebaseConfig = {
 
 const fbApp = initializeApp(firebaseConfig);
 const db = getFirestore(fbApp);
+const auth = getAuth(fbApp);
+
+// ── AUTHENTIFICATION ANONYME (invisible pour l'utilisateur) ──
+// Se connecte automatiquement en arriere-plan, sans ecran de login.
+// Necessaire car les regles Firestore exigent desormais request.auth != null.
+function waitForAuth() {
+  return new Promise((resolve, reject) => {
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        resolve(user);
+      } else {
+        signInAnonymously(auth).catch(reject);
+      }
+    }, reject);
+  });
+}
 
 // ── CONSTANTES ──────────────────────────────────────────────
 const UNITES = ['L/HA', 'KG/HA', 'L/HL'];
@@ -500,6 +517,16 @@ async function init() {
   loading(true);
   // Timeout securite : si Firebase ne repond pas en 10s, on cache le loading
   const timeout = setTimeout(() => loading(false), 10000);
+
+  try {
+    await waitForAuth();
+  } catch (e) {
+    console.error('Erreur authentification', e);
+    loading(false);
+    toast("Erreur de connexion. Verifiez votre reseau et rechargez la page.");
+    return;
+  }
+
   let firstLoad = true;
   onSnapshot(exploitsCol(), snap => {
     S.exploitations = snap.docs.map(d => ({id: d.id, ...d.data()}));
