@@ -241,8 +241,12 @@ tr:hover td{background:var(--vert-xxl);}
   <!-- PASSAGES -->
   <div id="page-passages" class="page">
     <div class="page-header">
-      <h2>Passages de traitement</h2>
-      <button class="btn btn-primary btn-sm" onclick="openPassageModal(null)">+ Ajouter</button>
+      <h2>Passages</h2>
+      <div style="display:flex;gap:8px;" id="passages-actions"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <div class="tab active" id="psubtab-phyto" onclick="showPassagesView('phyto')" style="border-radius:50px;padding:8px 16px;">Phyto</div>
+      <div class="tab" id="psubtab-engrais" onclick="showPassagesView('engrais')" style="border-radius:50px;padding:8px 16px;">Engrais</div>
     </div>
     <div id="passages-list"></div>
   </div>
@@ -450,6 +454,7 @@ const S = {
   produits: [],      // depuis base commune
   engrais: [],       // depuis base commune (fertilisation)
   produitsView: 'phyto',
+  passagesView: 'phyto',
   categories: [],    // depuis base commune
   parcelles: [],     // propre a l'exploitation
   cultures: [],      // propre a l'exploitation (agricole)
@@ -1062,7 +1067,8 @@ function render() {
     btlEl.textContent = 'Base commune ' + btr + ' — ' + S.produits.length + ' produit(s), ' + S.categories.length + ' categorie(s)';
   }
   renderDash(cp);
-  renderPassages(cp);
+  renderPassages(cp.filter(p => S.passagesView === 'engrais' ? (p.type === 'engrais') : (p.type !== 'engrais')));
+  updatePassagesActions();
   renderProduits();
   renderEngrais();
   updateProduitsActions();
@@ -1085,6 +1091,21 @@ function renderDash(cp) {
     '</tbody></table></div>';
 }
 
+window.showPassagesView = function(view) {
+  document.getElementById('psubtab-phyto').classList.toggle('active', view==='phyto');
+  document.getElementById('psubtab-engrais').classList.toggle('active', view==='engrais');
+  S.passagesView = view;
+  render();
+};
+
+function updatePassagesActions() {
+  const el = document.getElementById('passages-actions');
+  if (!el) return;
+  el.innerHTML = S.passagesView === 'engrais'
+    ? '<button class="btn btn-primary btn-sm" onclick="openPassageEngraisModal(null)">+ Ajouter</button>'
+    : '<button class="btn btn-primary btn-sm" onclick="openPassageModal(null)">+ Ajouter</button>';
+}
+
 function renderPassages(cp) {
   const el = document.getElementById('passages-list');
   if (!cp || !cp.length) {
@@ -1092,13 +1113,26 @@ function renderPassages(cp) {
     return;
   }
   el.innerHTML = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).map(p => {
+    const isEng = p.type === 'engrais';
+    let bodyHTML, rightBadge;
+    if (isEng) {
+      const engs = p.engraisList || [];
+      bodyHTML = engs.map(e => {
+        const a = e.apportsCalcules || {};
+        const apportsTxt = ['n','p','k','mgo','so3','fe'].map(k => a[k] ? k.toUpperCase()+':'+a[k] : null).filter(Boolean).join(' / ') || '-';
+        return '<div class="prod-line"><span style="flex:1;font-weight:600;">' + e.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (e.qte ? '<strong>' + e.qte + '</strong> ' + (e.unite||'') : '') + '</span><span style="font-size:11px;color:var(--vert);min-width:120px;text-align:right;">' + apportsTxt + '</span></div>';
+      }).join('') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + p.notes + '</div>' : '');
+      rightBadge = '';
+    } else {
     const prods = p.produitsList || [];
     const byCat = {};
     prods.forEach(pr => { if (!byCat[pr.cat]) byCat[pr.cat] = []; byCat[pr.cat].push(pr); });
-    const bodyHTML = Object.entries(byCat).map(([cat,list]) =>
+    bodyHTML = Object.entries(byCat).map(([cat,list]) =>
       '<div class="prod-cat-title">' + cat + '</div>' +
       list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (pr.qte ? '<strong>' + pr.qte + '</strong> ' + (pr.unite||'') : (pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;margin-left:auto;">DRE ' + pr.dre + 'h</span>' : '<span style="min-width:50px;"></span>') + '</div>').join('')
     ).join('') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + p.notes + '</div>' : '');
+    rightBadge = (function(){ var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; return v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; })();
+    }
 
     return '<div class="passage-item">' +
       '<div class="passage-header" onclick="togglePBody(\'pb' + p.id + '\')">' +
@@ -1106,11 +1140,11 @@ function renderPassages(cp) {
         '<div><div class="passage-date">' + fmtDate(p.date) + (p.heureDebut ? ' — ' + p.heureDebut : '') + '</div>' +
         '<div class="passage-meta">' + ((p.parcelles||[]).join(', ')||'Toutes parcelles') + '</div></div>' +
         '<div class="passage-right"><div style="font-size:11px;color:var(--gris);text-align:right;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.stade||'') + '</div>' +
-        '<div style="display:flex;gap:4px;">' + (function(){ var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; return v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; })() + '</div></div>' +
+        '<div style="display:flex;gap:4px;">' + rightBadge + '</div></div>' +
       '</div>' +
       '<div class="passage-body" id="pb' + p.id + '">' + (bodyHTML || '<span style="font-size:12px;color:var(--gris);">Aucun produit saisi.</span>') +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
-          '<button class="btn btn-icon edt" onclick="openPassageModal(\'' + p.id + '\')" title="Modifier">✏️</button>' +
+          '<button class="btn btn-icon edt" onclick="' + (isEng ? 'openPassageEngraisModal' : 'openPassageModal') + '(\'' + p.id + '\')" title="Modifier">✏️</button>' +
           '<button class="btn btn-icon del" onclick="delPassage(\'' + p.id + '\')" title="Supprimer">🗑️</button>' +
         '</div>' +
       '</div>' +
@@ -1452,44 +1486,9 @@ window.openPassageModal = function(pid) {
       '</div></div>';
   }).join('');
 
-  const engraisHTML = (function() {
-    if (!S.engrais.length) return '';
-    const cats = [...new Set(S.engrais.map(eg => eg.categorie || 'Autre'))];
-    const existingEng = p ? (p.engraisList||[]) : [];
-    return '<div class="section-title">Engrais appliques</div>' +
-      cats.map(cat => {
-        const catEngs = S.engrais.filter(eg => (eg.categorie||'Autre') === cat);
-        const existing = existingEng.filter(eg => (eg.categorie||'Autre') === cat);
-        return '<div class="prod-pills-section">' +
-          '<div class="prod-pills-title">' + cat + '</div>' +
-          '<div class="prod-pills-grid">' +
-          catEngs.map(eg => {
-            const sel = existing.find(e => e.nom === eg.nom);
-            const isActive = !!sel;
-            const selQte = sel ? sel.qte : eg.qte;
-            const selUnite = sel ? sel.unite : (eg.unite || 'kg/ha');
-            const c = eg.composition || {};
-            return '<div class="prod-pill eng-pill' + (isActive ? ' active' : '') + '" data-cat="' + cat + '" data-nom="' + eg.nom + '" ' +
-              'data-n="' + (c.n||0) + '" data-p="' + (c.p||0) + '" data-k="' + (c.k||0) + '" data-mgo="' + (c.mgo||0) + '" data-so3="' + (c.so3||0) + '" data-fe="' + (c.fe||0) + '" ' +
-              'onclick="window.togglePill(this)">' +
-              '<div class="prod-pill-name">' + eg.nom + '</div>' +
-              '<div class="prod-pill-dose" style="display:flex;align-items:center;gap:4px;">' +
-                '<input type="number" class="pill-qte" step="0.01" value="' + (selQte||'') + '" placeholder="qte" onclick="event.stopPropagation()" style="width:60px;">' +
-                '<select class="pill-unite" onclick="event.stopPropagation()" style="font-size:11px;padding:4px 5px;border:none;background:transparent;color:var(--vert);font-weight:600;cursor:pointer;">' +
-                  '<option value="kg/ha"' + (selUnite==='kg/ha'?' selected':'') + '>kg/ha</option>' +
-                  '<option value="L/ha"' + (selUnite==='L/ha'?' selected':'') + '>L/ha</option>' +
-                '</select>' +
-              '</div>' +
-            '</div>';
-          }).join('') +
-          '</div></div>';
-      }).join('') +
-      '<div id="engrais-apports-resume" style="background:var(--vert-xxl);border-radius:var(--r-sm);padding:10px 14px;margin:8px 0 14px;font-size:12px;color:var(--vert);"></div>';
-  })();
-
   const body =
     '<div class="form-grid" style="margin-bottom:12px;">' +
-      '<div class="form-group"><label>Passage N</label><input type="number" id="f-num" value="' + (p ? p.num : cpPassages().length+1) + '" min="1"></div>' +
+      '<div class="form-group"><label>Passage N</label><input type="number" id="f-num" value="' + (p ? p.num : cpPassages().filter(x=>x.type!=='engrais').length+1) + '" min="1"></div>' +
       '<div class="form-group"><label>Campagne</label><input type="text" id="f-camp" value="' + (p ? yearOf(p) : S.campagne) + '"></div>' +
       '<div class="form-group"><label>Date</label><input type="date" id="f-date" value="' + (p ? toISO(p.date) : '') + '"></div>' +
       '<div class="form-group"><label>DRE max (h) — auto</label><input type="number" id="f-dre" value="' + (p ? p.dre||0 : 0) + '" readonly style="background:var(--vert-xxl);color:var(--vert);font-weight:600;"></div>' +
@@ -1531,7 +1530,6 @@ window.openPassageModal = function(pid) {
     '</div>' +
     '<div class="section-title">Produits appliques</div>' +
     prodsHTML +
-    engraisHTML +
 
     '<div class="form-group" style="margin-top:10px;">' +
       '<label>Applicateur</label>' +
@@ -1591,30 +1589,12 @@ async function savePassage(pid) {
     const dose = qte ? (qte + ' ' + unite) : '';
     prodsList.push({nom, cat, dose, qte: parseFloat(qte)||0, unite, dre: base ? base.dre : 0, amm: base ? base.amm||'' : ''});
   });
-  const engList = [];
-  document.querySelectorAll('.eng-pill.active').forEach(pill => {
-    const nom = pill.dataset.nom;
-    const cat = pill.dataset.cat;
-    const qteEl = pill.querySelector('.pill-qte');
-    const uniteEl = pill.querySelector('.pill-unite');
-    const qte = parseFloat(qteEl ? qteEl.value : 0) || 0;
-    const unite = uniteEl ? uniteEl.value : 'kg/ha';
-    const compoPct = {
-      n: parseFloat(pill.dataset.n)||0, p: parseFloat(pill.dataset.p)||0,
-      k: parseFloat(pill.dataset.k)||0, mgo: parseFloat(pill.dataset.mgo)||0,
-      so3: parseFloat(pill.dataset.so3)||0, fe: parseFloat(pill.dataset.fe)||0
-    };
-    // Apport reel (kg/ha) = dose appliquee x % de composition / 100.
-    // Hypothese : 1 L/ha ~ 1 kg/ha (densite proche de 1 pour la plupart des solutions engrais).
-    const apportsCalcules = {};
-    Object.keys(compoPct).forEach(k => { apportsCalcules[k] = Math.round(qte * compoPct[k] / 100 * 100) / 100; });
-    engList.push({nom, categorie: cat, qte, unite, composition: compoPct, apportsCalcules});
-  });
   const cultEl2 = document.getElementById('f-culture');
   const appSel2 = document.getElementById('f-applicateur');
   const appId2 = appSel2 ? appSel2.value : '';
   const appObj = appId2 ? S.applicateurs.find(a => a.id === appId2) : null;
   const data = {
+    type: 'phyto',
     num: parseInt(document.getElementById('f-num').value)||1,
     campagne: document.getElementById('f-camp').value || S.campagne,
     culture: cultEl2 ? cultEl2.value : '',
@@ -1625,7 +1605,6 @@ async function savePassage(pid) {
     dre: parseInt(document.getElementById('f-dre').value)||0,
     parcelles: parc,
     produitsList: prodsList,
-    engraisList: engList,
 
     applicateurId: appId2 || '',
     applicateurNom: appObj ? appObj.nom : (getEx() ? getEx().nom : ''),
@@ -1647,6 +1626,119 @@ window.delPassage = function(id) {
     toast('Passage supprime');
   });
 };
+
+// ── PASSAGE ENGRAIS (formulaire dedie) ────────────────────────
+window.openPassageEngraisModal = function(pid) {
+  const p = pid ? S.passages.find(x => x.id === pid && x.type === 'engrais') : null;
+  const cats = [...new Set(S.engrais.map(eg => eg.categorie || 'Autre'))];
+  const existingEng = p ? (p.engraisList||[]) : [];
+
+  const engraisHTML = !S.engrais.length
+    ? '<div class="empty" style="padding:20px;"><div class="empty-text">Aucun engrais dans la base — ajoutez-en depuis l\'onglet Produits.</div></div>'
+    : cats.map(cat => {
+        const catEngs = S.engrais.filter(eg => (eg.categorie||'Autre') === cat);
+        const existing = existingEng.filter(eg => (eg.categorie||'Autre') === cat);
+        return '<div class="prod-pills-section">' +
+          '<div class="prod-pills-title">' + cat + '</div>' +
+          '<div class="prod-pills-grid">' +
+          catEngs.map(eg => {
+            const sel = existing.find(e => e.nom === eg.nom);
+            const isActive = !!sel;
+            const selQte = sel ? sel.qte : eg.qte;
+            const selUnite = sel ? sel.unite : (eg.unite || 'kg/ha');
+            const c = eg.composition || {};
+            return '<div class="prod-pill eng-pill' + (isActive ? ' active' : '') + '" data-cat="' + cat + '" data-nom="' + eg.nom + '" ' +
+              'data-n="' + (c.n||0) + '" data-p="' + (c.p||0) + '" data-k="' + (c.k||0) + '" data-mgo="' + (c.mgo||0) + '" data-so3="' + (c.so3||0) + '" data-fe="' + (c.fe||0) + '" ' +
+              'onclick="this.classList.toggle(\'active\')">' +
+              '<div class="prod-pill-name">' + eg.nom + '</div>' +
+              '<div class="prod-pill-dose" style="display:flex;align-items:center;gap:4px;">' +
+                '<input type="number" class="pill-qte" step="0.01" value="' + (selQte||'') + '" placeholder="qte" onclick="event.stopPropagation()" style="width:60px;">' +
+                '<select class="pill-unite" onclick="event.stopPropagation()" style="font-size:11px;padding:4px 5px;border:none;background:transparent;color:var(--vert);font-weight:600;cursor:pointer;">' +
+                  '<option value="kg/ha"' + (selUnite==='kg/ha'?' selected':'') + '>kg/ha</option>' +
+                  '<option value="L/ha"' + (selUnite==='L/ha'?' selected':'') + '>L/ha</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>';
+          }).join('') +
+          '</div></div>';
+      }).join('');
+
+  const body =
+    '<div class="form-grid" style="margin-bottom:12px;">' +
+      '<div class="form-group"><label>Passage N</label><input type="number" id="fe-num" value="' + (p ? p.num : cpPassages().filter(x=>x.type==='engrais').length+1) + '" min="1"></div>' +
+      '<div class="form-group"><label>Campagne</label><input type="text" id="fe-camp" value="' + (p ? yearOf(p) : S.campagne) + '"></div>' +
+      '<div class="form-group"><label>Date</label><input type="date" id="fe-date" value="' + (p ? toISO(p.date) : '') + '"></div>' +
+    '</div>' +
+    '<div style="margin-bottom:12px;">' +
+      '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--gris);margin-bottom:6px;">Parcelles concernees</div>' +
+      '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="selectAllParcellesEng(true)">Toutes</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="selectAllParcellesEng(false)">Aucune</button>' +
+      '</div>' +
+      '<div id="parc-checks-eng" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
+      S.parcelles.map(pa =>
+        '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--gris-l);border-radius:8px;cursor:pointer;font-size:13px;">' +
+        '<input type="checkbox" class="parc-cb-eng" value="' + pa.nom + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--vert);cursor:pointer;flex-shrink:0;">' +
+        pa.nom + '</label>'
+      ).join('') +
+      '</div>' +
+    '</div>' +
+    '<div class="section-title">Engrais appliques</div>' +
+    engraisHTML +
+    '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="fe-notes" rows="3" placeholder="Conditions, parcelle test...">' + (p?p.notes||'':'') + '</textarea></div>';
+
+  openModal(p ? 'Modifier le passage engrais' : 'Nouveau passage engrais', body, () => savePassageEngrais(pid));
+};
+
+window.selectAllParcellesEng = function(val) {
+  document.querySelectorAll('.parc-cb-eng').forEach(cb => cb.checked = val);
+};
+
+async function savePassageEngrais(pid) {
+  const dateISO = document.getElementById('fe-date').value;
+  if (!dateISO) { toast('Veuillez indiquer une date', true); return; }
+  const dateRaw = fmtDate(dateISO);
+  const parc = Array.from(document.querySelectorAll('.parc-cb-eng:checked')).map(cb=>cb.value);
+
+  const engList = [];
+  document.querySelectorAll('.eng-pill.active').forEach(pill => {
+    const nom = pill.dataset.nom;
+    const cat = pill.dataset.cat;
+    const qteEl = pill.querySelector('.pill-qte');
+    const uniteEl = pill.querySelector('.pill-unite');
+    const qte = parseFloat(qteEl ? qteEl.value : 0) || 0;
+    const unite = uniteEl ? uniteEl.value : 'kg/ha';
+    const compoPct = {
+      n: parseFloat(pill.dataset.n)||0, p: parseFloat(pill.dataset.p)||0,
+      k: parseFloat(pill.dataset.k)||0, mgo: parseFloat(pill.dataset.mgo)||0,
+      so3: parseFloat(pill.dataset.so3)||0, fe: parseFloat(pill.dataset.fe)||0
+    };
+    // Apport reel (kg/ha) = dose appliquee x % de composition / 100.
+    // Hypothese : 1 L/ha ~ 1 kg/ha (densite proche de 1 pour la plupart des solutions engrais).
+    const apportsCalcules = {};
+    Object.keys(compoPct).forEach(k => { apportsCalcules[k] = Math.round(qte * compoPct[k] / 100 * 100) / 100; });
+    engList.push({nom, categorie: cat, qte, unite, composition: compoPct, apportsCalcules});
+  });
+
+  if (!engList.length) { toast('Selectionnez au moins un engrais', true); return; }
+
+  const data = {
+    type: 'engrais',
+    num: parseInt(document.getElementById('fe-num').value)||1,
+    campagne: document.getElementById('fe-camp').value || S.campagne,
+    date: dateRaw,
+    parcelles: parc,
+    engraisList: engList,
+    notes: document.getElementById('fe-notes').value,
+    updatedAt: serverTimestamp()
+  };
+  try {
+    const eid = S.currentId;
+    if (pid) await updateDoc(subdoc(eid,'passages',pid), data);
+    else { data.createdAt = serverTimestamp(); await addDoc(sub(eid,'passages'), data); }
+    closeModal(); toast('Passage engrais enregistre');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
 
 // ── PRODUIT ──────────────────────────────────────────────────
 window.openProduitModal = function(pid, defCat) {
@@ -2014,7 +2106,7 @@ window.exportExcel = function() {
   const expSel = document.getElementById('export-campagne');
   const campagne = (expSel ? expSel.value : null) || S.campagne;
   const dateRecolte = (S.datesRecolte && S.datesRecolte[campagne]) || document.getElementById('export-recolte').value || '';
-  const passages = S.passages.filter(p => yearOf(p) === campagne).sort((a,b) => toISO(a.date)<toISO(b.date)?-1:1);
+  const passages = S.passages.filter(p => yearOf(p) === campagne && p.type !== 'engrais').sort((a,b) => toISO(a.date)<toISO(b.date)?-1:1);
   const rows = [];
 
   // ── TITRE ──
@@ -2133,7 +2225,7 @@ window.exportExcel = function() {
   XLSX.utils.book_append_sheet(wb, wsProd, 'Produits ' + campagne);
 
   // ── ONGLET ENGRAIS ──
-  const passagesEng = passages.filter(p => (p.engraisList||[]).length);
+  const passagesEng = S.passages.filter(p => yearOf(p) === campagne && p.type === 'engrais' && (p.engraisList||[]).length);
   if (passagesEng.length) {
     const engRows = [];
     engRows.push(['Fertilisation ' + campagne]);
