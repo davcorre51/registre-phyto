@@ -1121,7 +1121,7 @@ function renderPassages(cp) {
         const a = e.apportsCalcules || {};
         const apportsTxt = ['n','p','k','mgo','so3','fe'].map(k => a[k] ? k.toUpperCase()+':'+a[k] : null).filter(Boolean).join(' / ') || '-';
         return '<div class="prod-line"><span style="flex:1;font-weight:600;">' + e.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (e.qte ? '<strong>' + e.qte + '</strong> ' + (e.unite||'') : '') + '</span><span style="font-size:11px;color:var(--vert);min-width:120px;text-align:right;">' + apportsTxt + '</span></div>';
-      }).join('') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + p.notes + '</div>' : '');
+      }).join('') + (p.applicateurId ? '<div style="margin-top:6px;font-size:12px;color:var(--gris);">Applicateur : ' + (p.applicateurNom||'') + '</div>' : '') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + p.notes + '</div>' : '');
       rightBadge = '';
     } else {
     const prods = p.produitsList || [];
@@ -1211,6 +1211,25 @@ window.insertGPSNotes = function() {
     return;
   }
   const notes = document.getElementById('f-notes');
+  if (!notes) return;
+  const existing = notes.value.trim();
+  const gpsText = 'GPS : ' + gpsLines.join(' | ');
+  notes.value = existing ? existing + '\n' + gpsText : gpsText;
+  toast('GPS inseres dans les notes');
+};
+
+window.insertGPSNotesEng = function() {
+  const checks = document.querySelectorAll('.parc-cb-eng:checked');
+  const gpsLines = [];
+  checks.forEach(cb => {
+    const parc = S.parcelles.find(p => p.nom === cb.value);
+    if (parc && parc.gps) gpsLines.push(parc.nom + ' : ' + parc.gps);
+  });
+  if (!gpsLines.length) {
+    toast('Aucune coordonnee GPS sur les parcelles selectionnees', true);
+    return;
+  }
+  const notes = document.getElementById('fe-notes');
   if (!notes) return;
   const existing = notes.value.trim();
   const gpsText = 'GPS : ' + gpsLines.join(' | ');
@@ -1685,7 +1704,18 @@ window.openPassageEngraisModal = function(pid) {
     '</div>' +
     '<div class="section-title">Engrais appliques</div>' +
     engraisHTML +
-    '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="fe-notes" rows="3" placeholder="Conditions, parcelle test...">' + (p?p.notes||'':'') + '</textarea></div>';
+    '<div class="form-group" style="margin-top:10px;">' +
+      '<label>Applicateur</label>' +
+      '<select id="fe-applicateur">' +
+        '<option value="">— ' + (getEx()?getEx().nom:'Exploitation') + ' (par defaut) —</option>' +
+        (S.applicateurs||[]).map(a => {
+          const expire = a.certiphytoDate && new Date(a.certiphytoDate) < new Date();
+          return '<option value="' + a.id + '"' + (p&&p.applicateurId===a.id?' selected':'') + (expire?' style="color:var(--rouge);"':'') + '>' + a.nom + (expire?' ⚠ EXPIRE':'') + '</option>';
+        }).join('') +
+      '</select>' +
+    '</div>' +
+    '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="fe-notes" rows="3" placeholder="Conditions, parcelle test...">' + (p?p.notes||'':'') + '</textarea></div>' +
+    '<div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="insertGPSNotesEng()">📍 Inserer GPS parcelles</button></div>';
 
   openModal(p ? 'Modifier le passage engrais' : 'Nouveau passage engrais', body, () => savePassageEngrais(pid));
 };
@@ -1722,6 +1752,10 @@ async function savePassageEngrais(pid) {
 
   if (!engList.length) { toast('Selectionnez au moins un engrais', true); return; }
 
+  const appSelEng = document.getElementById('fe-applicateur');
+  const appIdEng = appSelEng ? appSelEng.value : '';
+  const appObjEng = appIdEng ? S.applicateurs.find(a => a.id === appIdEng) : null;
+
   const data = {
     type: 'engrais',
     num: parseInt(document.getElementById('fe-num').value)||1,
@@ -1729,6 +1763,9 @@ async function savePassageEngrais(pid) {
     date: dateRaw,
     parcelles: parc,
     engraisList: engList,
+    applicateurId: appIdEng || '',
+    applicateurNom: appObjEng ? appObjEng.nom : (getEx() ? getEx().nom : ''),
+    applicateurSiret: appObjEng ? appObjEng.siret||'' : (getEx() ? getEx().siret||'' : ''),
     notes: document.getElementById('fe-notes').value,
     updatedAt: serverTimestamp()
   };
@@ -2126,7 +2163,16 @@ window.exportExcel = function() {
   rows.push(['DRE',             '', ...passages.map(p => parseInt(p.dre)||0)]);
 
   // ── PRODUITS PAR CATEGORIE ──
-  const catNames = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(p=>p.cat)])];
+  // Ordre d'affichage souhaite : maladies groupees (Mildiou/Oidium/Fongicides), puis Herbicides, puis Insecticides, puis le reste.
+  const ORDRE_CATS_EXPORT = ['Mildiou', 'Oidium', 'Fongicides', 'Herbicides', 'Insecticides'];
+  const catNamesRaw = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(p=>p.cat)])];
+  const catNames = [...catNamesRaw].sort((a, b) => {
+    const ia = ORDRE_CATS_EXPORT.indexOf(a), ib = ORDRE_CATS_EXPORT.indexOf(b);
+    if (ia === -1 && ib === -1) return catNamesRaw.indexOf(a) - catNamesRaw.indexOf(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
   catNames.forEach(cat => {
     const noms = [], doses = [];
     passages.forEach(p => {
@@ -2232,23 +2278,24 @@ window.exportExcel = function() {
     engRows.push(['Identification', ex.nom]);
     engRows.push(['SIRET:', {t:'s', v:String(ex.siret||'')}]);
     engRows.push([]);
-    engRows.push(['Date','Parcelles','Produit','Categorie','Dose','N (kg/ha)','P (kg/ha)','K (kg/ha)','MgO (kg/ha)','SO3 (kg/ha)','Fe (kg/ha)']);
+    engRows.push(['Date','Produit','Categorie','Dose','N (kg/ha)','P (kg/ha)','K (kg/ha)','MgO (kg/ha)','SO3 (kg/ha)','Fe (kg/ha)','Parcelles','Commentaires']);
     const totaux = {n:0,p:0,k:0,mgo:0,so3:0,fe:0};
     passagesEng.forEach(p => {
       (p.engraisList||[]).forEach(e => {
         const a = e.apportsCalcules || {};
         engRows.push([
-          fmtDate(p.date), (p.parcelles||[]).join(' / '), e.nom, e.categorie||'',
+          fmtDate(p.date), e.nom, e.categorie||'',
           (e.qte||0) + ' ' + (e.unite||''),
-          a.n||0, a.p||0, a.k||0, a.mgo||0, a.so3||0, a.fe||0
+          a.n||0, a.p||0, a.k||0, a.mgo||0, a.so3||0, a.fe||0,
+          (p.parcelles||[]).join(' / '), p.notes||''
         ]);
         ['n','p','k','mgo','so3','fe'].forEach(k => { totaux[k] += a[k]||0; });
       });
     });
     engRows.push([]);
-    engRows.push(['Total apports campagne', '', '', '', '', totaux.n, totaux.p, totaux.k, totaux.mgo, totaux.so3, totaux.fe]);
+    engRows.push(['Total apports campagne', '', '', '', totaux.n, totaux.p, totaux.k, totaux.mgo, totaux.so3, totaux.fe, '', '']);
     const wsEng = XLSX.utils.aoa_to_sheet(engRows);
-    wsEng['!cols'] = [{wch:12},{wch:24},{wch:18},{wch:16},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10}];
+    wsEng['!cols'] = [{wch:12},{wch:18},{wch:16},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:24},{wch:24}];
     XLSX.utils.book_append_sheet(wb, wsEng, 'Engrais ' + campagne);
   }
 
