@@ -2164,10 +2164,11 @@ window.exportExcel = function() {
 
   // ── PRODUITS PAR CATEGORIE ──
   // Ordre d'affichage souhaite : maladies groupees (Mildiou/Oidium/Fongicides), puis Herbicides, puis Insecticides, puis le reste.
-  const ORDRE_CATS_EXPORT = ['Mildiou', 'Oidium', 'Fongicides', 'Herbicides', 'Insecticides'];
+  const ORDRE_CATS_EXPORT = ['MILDIOU', 'OIDIUM', 'FONGICIDES', 'HERBICIDES', 'INSECTICIDES'];
+  const normCat = s => (s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   const catNamesRaw = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(p=>p.cat)])];
   const catNames = [...catNamesRaw].sort((a, b) => {
-    const ia = ORDRE_CATS_EXPORT.indexOf(a), ib = ORDRE_CATS_EXPORT.indexOf(b);
+    const ia = ORDRE_CATS_EXPORT.indexOf(normCat(a)), ib = ORDRE_CATS_EXPORT.indexOf(normCat(b));
     if (ia === -1 && ib === -1) return catNamesRaw.indexOf(a) - catNamesRaw.indexOf(b);
     if (ia === -1) return 1;
     if (ib === -1) return -1;
@@ -2278,7 +2279,7 @@ window.exportExcel = function() {
     engRows.push(['Identification', ex.nom]);
     engRows.push(['SIRET:', {t:'s', v:String(ex.siret||'')}]);
     engRows.push([]);
-    engRows.push(['Date','Produit','Categorie','Dose','N (kg/ha)','P (kg/ha)','K (kg/ha)','MgO (kg/ha)','SO3 (kg/ha)','Fe (kg/ha)','Parcelles','Commentaires']);
+    engRows.push(['Date','Produit','Categorie','Dose','N (kg/ha)','P (kg/ha)','K (kg/ha)','MgO (kg/ha)','SO3 (kg/ha)','Fe (kg/ha)','Parcelles','Applicateur','Commentaires']);
     const totaux = {n:0,p:0,k:0,mgo:0,so3:0,fe:0};
     passagesEng.forEach(p => {
       (p.engraisList||[]).forEach(e => {
@@ -2287,15 +2288,15 @@ window.exportExcel = function() {
           fmtDate(p.date), e.nom, e.categorie||'',
           (e.qte||0) + ' ' + (e.unite||''),
           a.n||0, a.p||0, a.k||0, a.mgo||0, a.so3||0, a.fe||0,
-          (p.parcelles||[]).join(' / '), p.notes||''
+          (p.parcelles||[]).join(' / '), (p.applicateurId ? (p.applicateurNom||'') : ex.nom), p.notes||''
         ]);
         ['n','p','k','mgo','so3','fe'].forEach(k => { totaux[k] += a[k]||0; });
       });
     });
     engRows.push([]);
-    engRows.push(['Total apports campagne', '', '', '', totaux.n, totaux.p, totaux.k, totaux.mgo, totaux.so3, totaux.fe, '', '']);
+    engRows.push(['Total apports campagne', '', '', '', totaux.n, totaux.p, totaux.k, totaux.mgo, totaux.so3, totaux.fe, '', '', '']);
     const wsEng = XLSX.utils.aoa_to_sheet(engRows);
-    wsEng['!cols'] = [{wch:12},{wch:18},{wch:16},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:24},{wch:24}];
+    wsEng['!cols'] = [{wch:12},{wch:18},{wch:16},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:24},{wch:18},{wch:24}];
     XLSX.utils.book_append_sheet(wb, wsEng, 'Engrais ' + campagne);
   }
 
