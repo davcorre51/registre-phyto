@@ -2163,25 +2163,19 @@ window.exportExcel = function() {
   rows.push(['DRE',             '', ...passages.map(p => parseInt(p.dre)||0)]);
 
   // ── PRODUITS PAR CATEGORIE ──
-  // Ordre d'affichage souhaite : maladies groupees en premier (Mildiou/Oidium/Fongicides),
-  // puis les autres categories dans leur ordre d'origine, puis Herbicides et Insecticides en dernier (juste avant les Notes).
-  const MALADIES = ['MILDIOU', 'OIDIUM', 'FONGICIDES'];
-  const FIN_LISTE = ['HERBICIDES', 'INSECTICIDES'];
+  // Sequence d'affichage fixee explicitement (l'ordre brut stocke en base est alphabetique,
+  // ce qui ne correspond pas a la lecture agronomique souhaitee) :
+  // Adjuvants, Biocontrole/SDN, Botrytis, Mildiou, Oidium, Nutrition foliaire, Herbicides, Insecticides.
+  // Toute categorie non prevue dans cette liste est ajoutee a la fin, dans son ordre d'origine.
   const normCat = s => (s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const SEQUENCE = ['ADJUVANTS', 'BIOCONTROLE / SDN', 'BOTRYTIS', 'MILDIOU', 'OIDIUM', 'NUTRITION FOLIAIRE', 'HERBICIDES', 'INSECTICIDES'];
   const catNamesRaw = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(p=>p.cat)])];
   const catNames = [...catNamesRaw].sort((a, b) => {
-    const groupe = c => {
-      const n = normCat(c);
-      if (MALADIES.includes(n)) return 0;
-      if (FIN_LISTE.includes(n)) return 2;
-      return 1;
-    };
-    const ga = groupe(a), gb = groupe(b);
-    if (ga !== gb) return ga - gb;
-    // A l'interieur d'un meme groupe, on garde l'ordre d'origine (sauf maladies : Mildiou avant Oidium avant Fongicides)
-    if (ga === 0) return MALADIES.indexOf(normCat(a)) - MALADIES.indexOf(normCat(b));
-    if (ga === 2) return FIN_LISTE.indexOf(normCat(a)) - FIN_LISTE.indexOf(normCat(b));
-    return catNamesRaw.indexOf(a) - catNamesRaw.indexOf(b);
+    const ia = SEQUENCE.indexOf(normCat(a)), ib = SEQUENCE.indexOf(normCat(b));
+    if (ia === -1 && ib === -1) return catNamesRaw.indexOf(a) - catNamesRaw.indexOf(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
   });
   catNames.forEach(cat => {
     const noms = [], doses = [];
