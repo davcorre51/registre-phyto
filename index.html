@@ -228,6 +228,8 @@ tr:hover td{background:var(--vert-xxl);}
     <div class="stats-row">
       <div class="stat-card"><div class="stat-label">Passages</div><div class="stat-val" id="stat-passages">0</div><div class="stat-unit">enregistres</div></div>
 
+      <div class="stat-card" style="border-color:var(--vert);"><div class="stat-label">IFT Total</div><div class="stat-val" id="stat-ift">0</div><div class="stat-unit">campagne en cours (hors biocontrole)</div></div>
+
       <div class="stat-card rouge"><div class="stat-label">Parcelles</div><div class="stat-val" id="stat-parcelles">0</div><div class="stat-unit">dans l exploitation</div></div>
     </div>
 
@@ -498,6 +500,30 @@ function yearOf(p) {
 }
 function cpPassages() { return S.passages.filter(p => yearOf(p) === S.campagne); }
 function getEx() { return S.exploitations.find(e => e.id === S.currentId); }
+
+// IFT (Indice de Frequence de Traitement) d'un passage = somme, pour chaque produit hors biocontrole,
+// de (dose appliquee / dose recommandee) x (surface traitee / surface totale exploitation - methode A).
+function calcIFT(passage) {
+  if (!passage || passage.type === 'engrais') return 0;
+  const ex = S.exploitations.find(e => e.id === S.currentId) || getEx();
+  const surfaceExploit = ex ? parseFloat(ex.surface)||0 : 0;
+  if (!surfaceExploit) return 0;
+  const surfaceTraitee = (passage.parcelles||[]).reduce((sum, nomP) => {
+    const parc = S.parcelles.find(pc => pc.nom === nomP);
+    return sum + (parc ? parseFloat(parc.surface)||0 : 0);
+  }, 0);
+  if (!surfaceTraitee) return 0;
+  let total = 0;
+  (passage.produitsList||[]).forEach(pr => {
+    const catNorm = (pr.cat||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    if (catNorm.includes('BIOCONTROLE')) return; // exclu de l'IFT (methode IFT hors biocontrole)
+    const doseRecommandee = parseFloat(pr.doseRecommandee);
+    const doseAppliquee = parseFloat(pr.qte) || 0;
+    if (!doseRecommandee) return;
+    total += (doseAppliquee / doseRecommandee) * (surfaceTraitee / surfaceExploit);
+  });
+  return total;
+}
 
 function toast(msg, err) {
   const t = document.getElementById('toast');
@@ -1056,6 +1082,8 @@ function render() {
   const cp = cpPassages();
   document.getElementById('stat-passages').textContent = cp.length;
   document.getElementById('stat-parcelles').textContent = S.parcelles.length;
+  const iftTotal = cp.filter(p => p.type !== 'engrais').reduce((sum, p) => sum + (calcIFT(p)||0), 0);
+  document.getElementById('stat-ift').textContent = iftTotal.toFixed(2);
   updateExportResume();
   // Masquer date recolte pour agricole
   const recGrp = document.getElementById('recolte-group');
@@ -1131,7 +1159,7 @@ function renderPassages(cp) {
       '<div class="prod-cat-title">' + cat + '</div>' +
       list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (pr.qte ? '<strong>' + pr.qte + '</strong> ' + (pr.unite||'') : (pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;margin-left:auto;">DRE ' + pr.dre + 'h</span>' : '<span style="min-width:50px;"></span>') + '</div>').join('')
     ).join('') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + p.notes + '</div>' : '');
-    rightBadge = (function(){ var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; return v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; })();
+    rightBadge = (function(){ var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; var dreB = v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; var iftV = (p.ift!==undefined ? p.ift : calcIFT(p)); var iftB = iftV ? '<span class="badge" style="background:var(--vert-xxl);color:var(--vert);">IFT '+iftV.toFixed(2)+'</span>' : ''; return dreB+iftB; })();
     }
 
     return '<div class="passage-item">' +
@@ -1268,11 +1296,11 @@ function renderProduits() {
         '</div>' +
       '</div>' +
       '<div id="' + catKey + '">' +
-        '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Quantite</th><th>DRE (h)</th><th>N AMM</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
+        '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose recommandee</th><th>DRE (h)</th><th>DAR (j)</th><th>N AMM</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
         (prods.length ? prods.map(p =>
-          '<tr><td style="font-weight:600;">' + p.nom + '</td><td>' + (p.qte ? p.qte + ' ' + (p.unite||'') : (p.dose||'-')) + '</td><td>' + (p.dre||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td>' +
+          '<tr><td style="font-weight:600;">' + p.nom + '</td><td>' + (p.qte ? p.qte + ' ' + (p.unite||'') : (p.dose||'-')) + '</td><td>' + (p.dre||0) + '</td><td>' + (p.dar||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td>' +
           '<td><div class="td-actions"><button class="btn btn-icon edt" onclick="openProduitModal(\'' + p.id + '\',null)" title="Modifier">✏️</button><button class="btn btn-icon del" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>'
-        ).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--gris);font-size:12px;padding:12px;">Aucun produit</td></tr>') +
+        ).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--gris);font-size:12px;padding:12px;">Aucun produit</td></tr>') +
         '</tbody></table></div>' +
         '<button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="openProduitModal(null,\'' + cat + '\')">+ Produit ' + cat + '</button>' +
       '</div>' +
@@ -1606,7 +1634,7 @@ async function savePassage(pid) {
     const qte = qteEl ? qteEl.value : '';
     const unite = uniteEl ? uniteEl.value : (base ? base.unite||'L/HA' : 'L/HA');
     const dose = qte ? (qte + ' ' + unite) : '';
-    prodsList.push({nom, cat, dose, qte: parseFloat(qte)||0, unite, dre: base ? base.dre : 0, amm: base ? base.amm||'' : ''});
+    prodsList.push({nom, cat, dose, qte: parseFloat(qte)||0, unite, dre: base ? base.dre : 0, dar: base ? base.dar||0 : 0, amm: base ? base.amm||'' : '', doseRecommandee: base ? parseFloat(base.qte)||0 : 0});
   });
   const cultEl2 = document.getElementById('f-culture');
   const appSel2 = document.getElementById('f-applicateur');
@@ -1624,6 +1652,7 @@ async function savePassage(pid) {
     dre: parseInt(document.getElementById('f-dre').value)||0,
     parcelles: parc,
     produitsList: prodsList,
+    ift: Math.round(calcIFT({type:'phyto', parcelles: parc, produitsList: prodsList}) * 1000) / 1000,
 
     applicateurId: appId2 || '',
     applicateurNom: appObj ? appObj.nom : (getEx() ? getEx().nom : ''),
@@ -1788,9 +1817,10 @@ window.openProduitModal = function(pid, defCat) {
         catNames.map(c => '<option value="' + c + '"' + ((p&&p.cat===c)||(defCat===c)?' selected':'') + '>' + c + '</option>').join('') +
       '</select></div>' +
       '<div class="form-group"><label>N AMM</label><input type="text" id="fp-amm" value="' + (p?p.amm||'':'') + '" placeholder="7 chiffres"></div>' +
-      '<div class="form-group"><label>Quantite habituelle</label><input type="number" id="fp-qte" step="0.01" value="' + (p?p.qte||'':'') + '" placeholder="ex: 1.5"></div>' +
+      '<div class="form-group"><label>Dose recommandee</label><input type="number" id="fp-qte" step="0.01" value="' + (p?p.qte||'':'') + '" placeholder="ex: 1.5"></div>' +
       '<div class="form-group"><label>Unite</label><select id="fp-unite">' + UNITES.map(u => '<option value="' + u + '"' + (p&&p.unite===u?' selected':'') + '>' + u + '</option>').join('') + '</select></div>' +
       '<div class="form-group"><label>DRE (heures)</label><input type="number" id="fp-dre" value="' + (p?p.dre||0:0) + '"></div>' +
+      '<div class="form-group"><label>DAR (jours)</label><input type="number" id="fp-dar" value="' + (p?p.dar||0:0) + '"></div>' +
     '</div>';
   openModal(p ? 'Modifier le produit' : 'Nouveau produit', body, () => saveProduit(pid));
 };
@@ -1801,7 +1831,7 @@ async function saveProduit(pid) {
   const qte = document.getElementById('fp-qte').value;
   const unite = document.getElementById('fp-unite').value;
   const dose = qte ? (qte + ' ' + unite) : '';
-  const data = {nom, cat:document.getElementById('fp-cat').value, amm:document.getElementById('fp-amm').value, dose, qte: parseFloat(qte)||0, unite, dre:parseInt(document.getElementById('fp-dre').value)||0};
+  const data = {nom, cat:document.getElementById('fp-cat').value, amm:document.getElementById('fp-amm').value, dose, qte: parseFloat(qte)||0, unite, dre:parseInt(document.getElementById('fp-dre').value)||0, dar:parseInt(document.getElementById('fp-dar').value)||0};
   const ex = getEx();
   const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
   try {
@@ -2161,6 +2191,7 @@ window.exportExcel = function() {
   rows.push(['Nbr. de passage', '', ...passages.map((_,i) => i+1)]);
   rows.push(['Date de passage', '', ...passages.map(p => fmtDate(p.date))]);
   rows.push(['DRE',             '', ...passages.map(p => parseInt(p.dre)||0)]);
+  rows.push(['IFT',             '', ...passages.map(p => (p.ift!==undefined ? p.ift : calcIFT(p))||0)]);
 
   // ── PRODUITS PAR CATEGORIE ──
   // Sequence d'affichage fixee explicitement (l'ordre brut stocke en base est alphabetique,
