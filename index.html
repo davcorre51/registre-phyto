@@ -454,6 +454,7 @@ const S = {
   campagne: String(new Date().getFullYear()),
   passages: [],
   produits: [],      // depuis base commune
+  produitsFiltre: '',
   engrais: [],       // depuis base commune (fertilisation)
   produitsView: 'phyto',
   passagesView: 'phyto',
@@ -1282,31 +1283,58 @@ function renderProduits() {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🌿</div><div class="empty-text">Aucun produit</div></div>';
     return;
   }
-  el.innerHTML = catNames.map(cat => {
-    const prods = S.produits.filter(p => p.cat === cat);
+  const filtre = (S.produitsFiltre||'').toUpperCase().trim();
+  const matchFiltre = p => !filtre || p.nom.toUpperCase().includes(filtre);
+  const rowHtml = p => '<tr style="' + (p.actif===false ? 'opacity:0.55;' : '') + '"><td style="font-weight:600;">' + (p.favori ? '⭐ ' : '') + p.nom + (p.actif===false ? ' <span style="font-size:10px;color:var(--gris);font-weight:400;">(archive)</span>' : '') + '</td><td>' + (p.qte ? p.qte + ' ' + (p.unite||'') : (p.dose||'-')) + '</td><td>' + (p.dre||0) + '</td><td>' + (p.dar||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td><td>' + (p.doseReference!==null && p.doseReference!==undefined ? p.doseReference : '<span style="color:var(--gris);font-size:11px;">hors IFT</span>') + '</td>' +
+    '<td><div class="td-actions"><button class="btn btn-icon" onclick="toggleFavoriProduit(\'' + p.id + '\',' + (p.favori ? 'true' : 'false') + ')" title="' + (p.favori ? 'Retirer des favoris' : 'Marquer comme favori') + '">' + (p.favori ? '⭐' : '☆') + '</button>' +
+    '<button class="btn btn-icon edt" onclick="openProduitModal(\'' + p.id + '\',null)" title="Modifier">✏️</button>' +
+    '<button class="btn btn-icon" onclick="toggleArchiveProduit(\'' + p.id + '\',' + (p.actif===false ? 'true' : 'false') + ')" title="' + (p.actif===false ? 'Reactiver' : 'Archiver') + '">' + (p.actif===false ? '♻️' : '📦') + '</button>' +
+    '<button class="btn btn-icon del" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>';
+  el.innerHTML =
+    '<div class="form-group" style="max-width:320px;margin-bottom:12px;"><input type="text" id="produits-search" placeholder="🔎 Rechercher un produit..." value="' + (S.produitsFiltre||'') + '" oninput="S.produitsFiltre=this.value;renderProduits();" onclick="event.stopPropagation()"></div>' +
+    catNames.map(cat => {
+    const prodsAll = S.produits.filter(p => p.cat === cat).filter(matchFiltre);
+    const prods = prodsAll.filter(p => p.actif !== false).sort((a,b) => (b.favori?1:0) - (a.favori?1:0));
+    const archives = prodsAll.filter(p => p.actif === false);
+    if (filtre && !prodsAll.length) return '';
     const catObj = S.categories.find(c => c.nom === cat);
     const catKey = 'c' + cat.replace(/[^a-z0-9]/gi,'');
     return '<div class="produits-cat-section">' +
       '<div class="produits-cat-header" onclick="toggleCat(\'' + catKey + '\')">' +
         '<span class="produits-cat-name">' + cat + '</span>' +
         '<div style="display:flex;align-items:center;gap:8px;">' +
-          '<span style="font-size:11px;color:var(--gris);">' + prods.length + ' produit(s)</span>' +
+          '<span style="font-size:11px;color:var(--gris);">' + prods.length + ' produit(s)' + (archives.length ? ' + ' + archives.length + ' archive(s)' : '') + '</span>' +
           (catObj ? '<button class="btn btn-icon edt" onclick="event.stopPropagation();openEditCatModal(\'' + catObj.id + '\',\'' + cat + '\')" title="Modifier">✏️</button>' : '') +
           (catObj ? '<button class="btn btn-icon del" onclick="event.stopPropagation();delCat(\'' + catObj.id + '\',\'' + cat + '\')" title="Supprimer">🗑️</button>' : '') +
         '</div>' +
       '</div>' +
       '<div id="' + catKey + '">' +
         '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose recommandee</th><th>DRE (h)</th><th>DAR (j)</th><th>N AMM</th><th>Dose ref. IFT</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
-        (prods.length ? prods.map(p =>
-          '<tr><td style="font-weight:600;">' + p.nom + '</td><td>' + (p.qte ? p.qte + ' ' + (p.unite||'') : (p.dose||'-')) + '</td><td>' + (p.dre||0) + '</td><td>' + (p.dar||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td><td>' + (p.doseReference!==null && p.doseReference!==undefined ? p.doseReference : '<span style="color:var(--gris);font-size:11px;">hors IFT</span>') + '</td>' +
-          '<td><div class="td-actions"><button class="btn btn-icon edt" onclick="openProduitModal(\'' + p.id + '\',null)" title="Modifier">✏️</button><button class="btn btn-icon del" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>'
-        ).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--gris);font-size:12px;padding:12px;">Aucun produit</td></tr>') +
+        (prodsAll.length ? [...prods, ...archives].map(rowHtml).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--gris);font-size:12px;padding:12px;">Aucun produit</td></tr>') +
         '</tbody></table></div>' +
         '<button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="openProduitModal(null,\'' + cat + '\')">+ Produit ' + cat + '</button>' +
       '</div>' +
     '</div>';
   }).join('');
 }
+
+window.toggleArchiveProduit = async function(id, reactivate) {
+  const ex = getEx();
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  try {
+    await setDoc(baseDoc(btype,'produits',id), {actif: !!reactivate ? true : false}, {merge:true});
+    toast(reactivate ? 'Produit reactive' : 'Produit archive');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+};
+
+window.toggleFavoriProduit = async function(id, current) {
+  const ex = getEx();
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  try {
+    await setDoc(baseDoc(btype,'produits',id), {favori: !current}, {merge:true});
+    toast(!current ? 'Ajoute aux favoris' : 'Retire des favoris');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+};
 
 window.showProduitsView = function(view) {
   document.getElementById('subtab-phyto').classList.toggle('active', view==='phyto');
@@ -1509,9 +1537,9 @@ window.openPassageModal = function(pid) {
   ).join('');
 
   const prodsHTML = catNames.map(cat => {
-    const catProds = S.produits.filter(pr => pr.cat === cat);
-    if (!catProds.length) return '';
     const existing = p ? (p.produitsList||[]).filter(pr => pr.cat === cat) : [];
+    const catProds = S.produits.filter(pr => pr.cat === cat && (pr.actif !== false || existing.some(e => e.nom === pr.nom))).sort((a,b) => (b.favori?1:0) - (a.favori?1:0));
+    if (!catProds.length) return '';
     return '<div class="prod-pills-section">' +
       '<div class="prod-pills-title">' + cat + '</div>' +
       '<div class="prod-pills-grid">' +
@@ -1521,7 +1549,7 @@ window.openPassageModal = function(pid) {
         const selQte = sel ? (sel.qte !== undefined ? sel.qte : extractQte(sel.dose||'')) : (pr.qte || extractQte(pr.dose||''));
         const selUnite = sel ? (sel.unite || extractUnite(sel.dose||'', pr.unite||'L/HA')) : (pr.unite || 'L/HA');
         return '<div class="prod-pill' + (isActive ? ' active' : '') + '" data-cat="' + cat + '" data-nom="' + pr.nom + '" data-dre="' + (pr.dre||0) + '" data-amm="' + (pr.amm||'') + '" data-unite="' + selUnite + '" onclick="togglePill(this)">' +
-          '<div class="prod-pill-name">' + pr.nom + '</div>' +
+          '<div class="prod-pill-name">' + (pr.favori ? '⭐ ' : '') + pr.nom + '</div>' +
           '<div class="prod-pill-dose" style="display:flex;align-items:center;gap:4px;">' +
             '<input type="number" class="pill-qte" step="0.01" value="' + (selQte||'') + '" placeholder="qte" onclick="event.stopPropagation()" style="width:60px;">' +
             '<select class="pill-unite" onclick="event.stopPropagation()" style="font-size:11px;padding:4px 5px;border:none;background:transparent;color:var(--vert);font-weight:600;cursor:pointer;">' +
