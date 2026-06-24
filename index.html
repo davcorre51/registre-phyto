@@ -264,7 +264,7 @@ tr:hover td{background:var(--vert-xxl);}
       <div class="tab" id="subtab-engrais" onclick="showProduitsView('engrais')" style="border-radius:50px;padding:8px 16px;">Engrais</div>
     </div>
     <div class="form-group" id="produits-search-wrap" style="max-width:320px;margin-bottom:12px;">
-      <input type="text" id="produits-search" placeholder="🔎 Rechercher un produit..." oninput="S.produitsFiltre=this.value;renderProduits();">
+      <input type="text" id="produits-search" placeholder="🔎 Rechercher un produit..." oninput="filtreProduits(this.value)">
     </div>
     <div id="produits-sections"></div>
     <div id="engrais-sections" style="display:none;"></div>
@@ -1277,6 +1277,11 @@ window.selectAllParcelles = function(checked) {
 window.togglePBody = function(id) {
   const el = document.getElementById(id);
   if (el) el.classList.toggle('open');
+};
+
+window.filtreProduits = function(val) {
+  S.produitsFiltre = val;
+  renderProduits();
 };
 
 function renderProduits() {
