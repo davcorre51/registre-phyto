@@ -263,6 +263,9 @@ tr:hover td{background:var(--vert-xxl);}
       <div class="tab active" id="subtab-phyto" onclick="showProduitsView('phyto')" style="border-radius:50px;padding:8px 16px;">Produits phyto</div>
       <div class="tab" id="subtab-engrais" onclick="showProduitsView('engrais')" style="border-radius:50px;padding:8px 16px;">Engrais</div>
     </div>
+    <div class="form-group" id="produits-search-wrap" style="max-width:320px;margin-bottom:12px;">
+      <input type="text" id="produits-search" placeholder="🔎 Rechercher un produit..." oninput="S.produitsFiltre=this.value;renderProduits();">
+    </div>
     <div id="produits-sections"></div>
     <div id="engrais-sections" style="display:none;"></div>
   </div>
@@ -1291,7 +1294,6 @@ function renderProduits() {
     '<button class="btn btn-icon" onclick="toggleArchiveProduit(\'' + p.id + '\',' + (p.actif===false ? 'true' : 'false') + ')" title="' + (p.actif===false ? 'Reactiver' : 'Archiver') + '">' + (p.actif===false ? '♻️' : '📦') + '</button>' +
     '<button class="btn btn-icon del" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>';
   el.innerHTML =
-    '<div class="form-group" style="max-width:320px;margin-bottom:12px;"><input type="text" id="produits-search" placeholder="🔎 Rechercher un produit..." value="' + (S.produitsFiltre||'') + '" oninput="S.produitsFiltre=this.value;renderProduits();" onclick="event.stopPropagation()"></div>' +
     catNames.map(cat => {
     const prodsAll = S.produits.filter(p => p.cat === cat).filter(matchFiltre);
     const prods = prodsAll.filter(p => p.actif !== false).sort((a,b) => (b.favori?1:0) - (a.favori?1:0));
@@ -1340,6 +1342,7 @@ window.showProduitsView = function(view) {
   document.getElementById('subtab-phyto').classList.toggle('active', view==='phyto');
   document.getElementById('subtab-engrais').classList.toggle('active', view==='engrais');
   document.getElementById('produits-sections').style.display = view==='phyto' ? '' : 'none';
+  document.getElementById('produits-search-wrap').style.display = view==='phyto' ? '' : 'none';
   document.getElementById('engrais-sections').style.display = view==='engrais' ? '' : 'none';
   S.produitsView = view;
   updateProduitsActions();
