@@ -513,11 +513,13 @@ function calcIFT(passage) {
   const surfaceExploit = ex ? parseFloat(ex.surface)||0 : 0;
   if (!surfaceExploit) return 0;
   const ids = passage.parcellesIds || [];
-  const surfaceTraitee = (passage.parcelles||[]).reduce((sum, nomP, idx) => {
+  const surfaceTraiteeBrute = (passage.parcelles||[]).reduce((sum, nomP, idx) => {
     const idP = ids[idx];
     const parc = (idP && S.parcelles.find(pc => pc.id === idP)) || S.parcelles.find(pc => pc.nom === nomP);
     return sum + (parc ? parseFloat(parc.surface)||0 : 0);
   }, 0);
+  const pct = Math.min(100, Math.max(0, parseFloat(passage.pourcentSurface) || 100)) / 100;
+  const surfaceTraitee = surfaceTraiteeBrute * pct;
   if (!surfaceTraitee) return 0;
   let total = 0;
   (passage.produitsList||[]).forEach(pr => {
@@ -1165,7 +1167,7 @@ function renderPassages(cp) {
       '<div class="prod-cat-title">' + cat + '</div>' +
       list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (pr.qte ? '<strong>' + pr.qte + '</strong> ' + (pr.unite||'') : (pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;margin-left:auto;">DRE ' + pr.dre + 'h</span>' : '<span style="min-width:50px;"></span>') + '</div>').join('')
     ).join('') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + p.notes + '</div>' : '');
-    rightBadge = (function(){ var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; var dreB = v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; var iftV = (p.ift!==undefined ? p.ift : calcIFT(p)); var iftB = Number.isFinite(iftV) && iftV ? '<span class="badge" style="background:var(--vert-xxl);color:var(--vert);">IFT '+iftV.toFixed(2)+'</span>' : ''; return dreB+iftB; })();
+    rightBadge = (function(){ var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; var dreB = v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; var iftV = (p.ift!==undefined ? p.ift : calcIFT(p)); var iftB = Number.isFinite(iftV) && iftV ? '<span class="badge" style="background:var(--vert-xxl);color:var(--vert);">IFT '+iftV.toFixed(2)+'</span>' : ''; var pctB = (p.pourcentSurface && p.pourcentSurface < 100) ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">'+p.pourcentSurface+'% surface</span>' : ''; return dreB+iftB+pctB; })();
     }
 
     return '<div class="passage-item">' +
@@ -1612,6 +1614,10 @@ window.openPassageModal = function(pid) {
         pa.nom + '</label>'
       ).join('') +
       '</div>' +
+      '<div class="form-group" style="margin-top:10px;max-width:260px;">' +
+        '<label>% de la surface traitee (desherbage localise, 100% si traitement total)</label>' +
+        '<input type="number" id="f-pct-surface" min="1" max="100" value="' + (p && p.pourcentSurface ? p.pourcentSurface : 100) + '">' +
+      '</div>' +
     '</div>' +
     '<div class="section-title">Produits appliques</div>' +
     prodsHTML +
@@ -1692,8 +1698,9 @@ async function savePassage(pid) {
     dre: parseInt(document.getElementById('f-dre').value)||0,
     parcelles: parc,
     parcellesIds: parcIds,
+    pourcentSurface: Math.min(100, Math.max(1, parseFloat(document.getElementById('f-pct-surface').value) || 100)),
     produitsList: prodsList,
-    ift: (function(){ try { var v = calcIFT({type:'phyto', parcelles: parc, parcellesIds: parcIds, produitsList: prodsList}); return Number.isFinite(v) ? Math.round(v * 1000) / 1000 : 0; } catch(e) { console.error('Erreur calcul IFT', e); return 0; } })(),
+    ift: (function(){ try { var pct = Math.min(100, Math.max(1, parseFloat(document.getElementById('f-pct-surface').value) || 100)); var v = calcIFT({type:'phyto', parcelles: parc, parcellesIds: parcIds, pourcentSurface: pct, produitsList: prodsList}); return Number.isFinite(v) ? Math.round(v * 1000) / 1000 : 0; } catch(e) { console.error('Erreur calcul IFT', e); return 0; } })(),
 
     applicateurId: appId2 || '',
     applicateurNom: appObj ? appObj.nom : (getEx() ? getEx().nom : ''),
