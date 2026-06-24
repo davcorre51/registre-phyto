@@ -1166,8 +1166,7 @@ function renderPassages(cp) {
     bodyHTML = Object.entries(byCat).map(([cat,list]) =>
       '<div class="prod-cat-title">' + cat + '</div>' +
       list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (pr.qte ? '<strong>' + pr.qte + '</strong> ' + (pr.unite||'') : (pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;margin-left:auto;">DRE ' + pr.dre + 'h</span>' : '<span style="min-width:50px;"></span>') + '</div>').join('')
-    ).join('') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + p.notes + '</div>' : '');
-    rightBadge = (function(){ var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; var dreB = v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; var iftV = (p.ift!==undefined ? p.ift : calcIFT(p)); var iftB = Number.isFinite(iftV) && iftV ? '<span class="badge" style="background:var(--vert-xxl);color:var(--vert);">IFT '+iftV.toFixed(2)+'</span>' : ''; var pctB = (p.pourcentSurface && p.pourcentSurface < 100) ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">'+p.pourcentSurface+'% surface</span>' : ''; return dreB+iftB+pctB; })();
+    ).join('') + (function(){ var pctTxt = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : ''; var combined = [pctTxt, p.notes||''].filter(Boolean).join(' — '); return combined ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + combined + '</div>' : ''; })();
     }
 
     return '<div class="passage-item">' +
@@ -2278,7 +2277,10 @@ window.exportExcel = function() {
   const hasNotes = passages.some(p => p.notes && p.notes.trim());
   if (hasNotes) {
     rows.push([]);
-    rows.push(['Notes / observations', '', ...passages.map(p => p.notes||'')]);
+    rows.push(['Notes / observations', '', ...passages.map(p => {
+      const pct = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : '';
+      return [pct, p.notes||''].filter(Boolean).join(' — ');
+    })]);
   }
 
   // ── APPLICATEUR ──
