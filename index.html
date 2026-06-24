@@ -512,8 +512,10 @@ function calcIFT(passage) {
   const ex = S.exploitations.find(e => e.id === S.currentId) || getEx();
   const surfaceExploit = ex ? parseFloat(ex.surface)||0 : 0;
   if (!surfaceExploit) return 0;
-  const surfaceTraitee = (passage.parcelles||[]).reduce((sum, nomP) => {
-    const parc = S.parcelles.find(pc => pc.nom === nomP);
+  const ids = passage.parcellesIds || [];
+  const surfaceTraitee = (passage.parcelles||[]).reduce((sum, nomP, idx) => {
+    const idP = ids[idx];
+    const parc = (idP && S.parcelles.find(pc => pc.id === idP)) || S.parcelles.find(pc => pc.nom === nomP);
     return sum + (parc ? parseFloat(parc.surface)||0 : 0);
   }, 0);
   if (!surfaceTraitee) return 0;
@@ -1606,7 +1608,7 @@ window.openPassageModal = function(pid) {
       '<div id="parc-checks" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
       S.parcelles.map(pa =>
         '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--gris-l);border-radius:8px;cursor:pointer;font-size:13px;">' +
-        '<input type="checkbox" class="parc-cb" value="' + pa.nom + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--vert);cursor:pointer;flex-shrink:0;">' +
+        '<input type="checkbox" class="parc-cb" value="' + pa.nom + '" data-id="' + pa.id + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--vert);cursor:pointer;flex-shrink:0;">' +
         pa.nom + '</label>'
       ).join('') +
       '</div>' +
@@ -1659,7 +1661,9 @@ async function savePassage(pid) {
   const dateISO = document.getElementById('f-date').value;
   if (!dateISO) { toast('Veuillez indiquer une date', true); return; }
   const dateRaw = fmtDate(dateISO);
-  const parc = Array.from(document.querySelectorAll('.parc-cb:checked')).map(cb=>cb.value);
+  const parcChecks = Array.from(document.querySelectorAll('.parc-cb:checked'));
+  const parc = parcChecks.map(cb=>cb.value);
+  const parcIds = parcChecks.map(cb=>cb.dataset.id||'');
   const prodsList = [];
   document.querySelectorAll('.prod-pill.active').forEach(pill => {
     const nom = pill.dataset.nom;
@@ -1687,8 +1691,9 @@ async function savePassage(pid) {
     stade: document.getElementById('f-stade').value,
     dre: parseInt(document.getElementById('f-dre').value)||0,
     parcelles: parc,
+    parcellesIds: parcIds,
     produitsList: prodsList,
-    ift: (function(){ try { var v = calcIFT({type:'phyto', parcelles: parc, produitsList: prodsList}); return Number.isFinite(v) ? Math.round(v * 1000) / 1000 : 0; } catch(e) { console.error('Erreur calcul IFT', e); return 0; } })(),
+    ift: (function(){ try { var v = calcIFT({type:'phyto', parcelles: parc, parcellesIds: parcIds, produitsList: prodsList}); return Number.isFinite(v) ? Math.round(v * 1000) / 1000 : 0; } catch(e) { console.error('Erreur calcul IFT', e); return 0; } })(),
 
     applicateurId: appId2 || '',
     applicateurNom: appObj ? appObj.nom : (getEx() ? getEx().nom : ''),
@@ -1762,7 +1767,7 @@ window.openPassageEngraisModal = function(pid) {
       '<div id="parc-checks-eng" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
       S.parcelles.map(pa =>
         '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--gris-l);border-radius:8px;cursor:pointer;font-size:13px;">' +
-        '<input type="checkbox" class="parc-cb-eng" value="' + pa.nom + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--vert);cursor:pointer;flex-shrink:0;">' +
+        '<input type="checkbox" class="parc-cb-eng" value="' + pa.nom + '" data-id="' + pa.id + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--vert);cursor:pointer;flex-shrink:0;">' +
         pa.nom + '</label>'
       ).join('') +
       '</div>' +
@@ -1793,7 +1798,9 @@ async function savePassageEngrais(pid) {
   const dateISO = document.getElementById('fe-date').value;
   if (!dateISO) { toast('Veuillez indiquer une date', true); return; }
   const dateRaw = fmtDate(dateISO);
-  const parc = Array.from(document.querySelectorAll('.parc-cb-eng:checked')).map(cb=>cb.value);
+  const parcChecksEng = Array.from(document.querySelectorAll('.parc-cb-eng:checked'));
+  const parc = parcChecksEng.map(cb=>cb.value);
+  const parcIds = parcChecksEng.map(cb=>cb.dataset.id||'');
 
   const engList = [];
   document.querySelectorAll('.eng-pill.active').forEach(pill => {
@@ -1827,6 +1834,7 @@ async function savePassageEngrais(pid) {
     campagne: document.getElementById('fe-camp').value || S.campagne,
     date: dateRaw,
     parcelles: parc,
+    parcellesIds: parcIds,
     engraisList: engList,
     applicateurId: appIdEng || '',
     applicateurNom: appObjEng ? appObjEng.nom : (getEx() ? getEx().nom : ''),
