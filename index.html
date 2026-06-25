@@ -1090,7 +1090,7 @@ function render() {
   const cp = cpPassages();
   document.getElementById('stat-passages').textContent = cp.length;
   document.getElementById('stat-parcelles').textContent = S.parcelles.length;
-  const iftTotal = cp.filter(p => p.type !== 'engrais').reduce((sum, p) => { var v = (p.ift!==undefined ? p.ift : calcIFT(p)); return sum + (Number.isFinite(v) ? v : 0); }, 0);
+  const iftTotal = cp.filter(p => p.type !== 'engrais').reduce((sum, p) => { try { var v = (p.ift!==undefined && p.ift!==null ? p.ift : calcIFT(p)); return sum + (Number.isFinite(v) ? v : 0); } catch(e) { return sum; } }, 0);
   document.getElementById('stat-ift').textContent = iftTotal.toFixed(2);
   updateExportResume();
   // Masquer date recolte pour agricole
@@ -1150,7 +1150,7 @@ function renderPassages(cp) {
   }
   el.innerHTML = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).map(p => {
     const isEng = p.type === 'engrais';
-    let bodyHTML, rightBadge;
+    let bodyHTML, rightBadge = '';
     if (isEng) {
       const engs = p.engraisList || [];
       bodyHTML = engs.map(e => {
@@ -1167,6 +1167,7 @@ function renderPassages(cp) {
       '<div class="prod-cat-title">' + cat + '</div>' +
       list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (pr.qte ? '<strong>' + pr.qte + '</strong> ' + (pr.unite||'') : (pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;margin-left:auto;">DRE ' + pr.dre + 'h</span>' : '<span style="min-width:50px;"></span>') + '</div>').join('')
     ).join('') + (function(){ var pctTxt = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : ''; var combined = [pctTxt, p.notes||''].filter(Boolean).join(' — '); return combined ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + combined + '</div>' : ''; })();
+    rightBadge = (function(){ try { var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; var dreB = v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; var iftV = (p.ift!==undefined && p.ift!==null ? p.ift : calcIFT(p)); var iftB = Number.isFinite(iftV) && iftV ? '<span class="badge" style="background:var(--vert-xxl);color:var(--vert);">IFT '+iftV.toFixed(2)+'</span>' : ''; var pctB = (p.pourcentSurface && p.pourcentSurface < 100) ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">'+p.pourcentSurface+'% surface</span>' : ''; return dreB+iftB+pctB; } catch(e) { console.error('Erreur affichage badge passage', p.id, e); return ''; } })();
     }
 
     return '<div class="passage-item">' +
@@ -2243,7 +2244,7 @@ window.exportExcel = function() {
   rows.push(['Nbr. de passage', '', ...passages.map((_,i) => i+1)]);
   rows.push(['Date de passage', '', ...passages.map(p => fmtDate(p.date))]);
   rows.push(['DRE',             '', ...passages.map(p => parseInt(p.dre)||0)]);
-  rows.push(['IFT',             '', ...passages.map(p => { var v = (p.ift!==undefined ? p.ift : calcIFT(p)); return Number.isFinite(v) ? v : 0; })]);
+  rows.push(['IFT',             '', ...passages.map(p => { try { var v = (p.ift!==undefined && p.ift!==null ? p.ift : calcIFT(p)); return Number.isFinite(v) ? v : 0; } catch(e) { return 0; } })]);
 
   // ── PRODUITS PAR CATEGORIE ──
   // Sequence d'affichage fixee explicitement (l'ordre brut stocke en base est alphabetique,
