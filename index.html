@@ -233,6 +233,11 @@ tr:hover td{background:var(--vert-xxl);}
       <div class="stat-card rouge"><div class="stat-label">Parcelles</div><div class="stat-val" id="stat-parcelles">0</div><div class="stat-unit">dans l exploitation</div></div>
     </div>
 
+    <div class="card" id="rainfall-card" style="display:none;">
+      <div class="card-title">🌧️ Pluviometrie depuis le dernier traitement</div>
+      <div id="rainfall-content"></div>
+    </div>
+
     <div class="card">
       <div class="card-title">Derniers passages</div>
       <div id="dash-passages"></div>
@@ -485,6 +490,16 @@ function fmtDate(v) {
     return d + '/' + m + '/' + String(y).slice(-2);
   }
   return v;
+}
+// Ajoute un nombre de jours a une date stockee au format DD/MM/YY (ou ISO), retourne au format DD/MM/YY
+function addDaysToDate(dateStr, days) {
+  const iso = toISO(dateStr);
+  if (!iso) return '';
+  const d = new Date(iso + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return '';
+  d.setDate(d.getDate() + (parseInt(days, 10) || 0));
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
+  return fmtDate(y + '-' + m + '-' + day);
 }
 function toISO(v) {
   if (!v) return '';
@@ -1113,6 +1128,7 @@ function render() {
 }
 
 function renderDash(cp) {
+  renderRainfallCard();
   const el = document.getElementById('dash-passages');
   if (!cp.length) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🌿</div><div class="empty-text">Aucun passage pour cette campagne</div></div>';
@@ -1167,7 +1183,7 @@ function renderPassages(cp) {
       '<div class="prod-cat-title">' + cat + '</div>' +
       list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (pr.qte ? '<strong>' + pr.qte + '</strong> ' + (pr.unite||'') : (pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;margin-left:auto;">DRE ' + pr.dre + 'h</span>' : '<span style="min-width:50px;"></span>') + '</div>').join('')
     ).join('') + (function(){ var pctTxt = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : ''; var combined = [pctTxt, p.notes||''].filter(Boolean).join(' — '); return combined ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + combined + '</div>' : ''; })();
-    rightBadge = (function(){ try { var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; var dreB = v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; var iftV = (p.ift!==undefined && p.ift!==null ? p.ift : calcIFT(p)); var iftB = Number.isFinite(iftV) && iftV ? '<span class="badge" style="background:var(--vert-xxl);color:var(--vert);">IFT '+iftV.toFixed(2)+'</span>' : ''; var pctB = (p.pourcentSurface && p.pourcentSurface < 100) ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">'+p.pourcentSurface+'% surface</span>' : ''; return dreB+iftB+pctB; } catch(e) { console.error('Erreur affichage badge passage', p.id, e); return ''; } })();
+    rightBadge = (function(){ try { var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; var dreB = v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; var iftV = (p.ift!==undefined && p.ift!==null ? p.ift : calcIFT(p)); var iftB = Number.isFinite(iftV) && iftV ? '<span class="badge" style="background:var(--vert-xxl);color:var(--vert);">IFT '+iftV.toFixed(2)+'</span>' : ''; var pctB = (p.pourcentSurface && p.pourcentSurface < 100) ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">'+p.pourcentSurface+'% surface</span>' : ''; var maxDar=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dar,10)||0);},0); var darB = maxDar ? '<span class="badge" style="background:#e7e0ff;color:#5b3fd4;" title="Recolte possible sans risque a partir de cette date, compte tenu du DAR le plus long des produits appliques">DAR : recolte des '+addDaysToDate(p.date, maxDar)+'</span>' : ''; return dreB+iftB+pctB+darB; } catch(e) { console.error('Erreur affichage badge passage', p.id, e); return ''; } })();
     }
 
     return '<div class="passage-item">' +
@@ -1181,6 +1197,7 @@ function renderPassages(cp) {
       '<div class="passage-body" id="pb' + p.id + '">' + (bodyHTML || '<span style="font-size:12px;color:var(--gris);">Aucun produit saisi.</span>') +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
           '<button class="btn btn-icon edt" onclick="' + (isEng ? 'openPassageEngraisModal' : 'openPassageModal') + '(\'' + p.id + '\')" title="Modifier">✏️</button>' +
+          '<button class="btn btn-icon" onclick="duplicatePassage(\'' + p.id + '\')" title="Dupliquer">📄</button>' +
           '<button class="btn btn-icon del" onclick="delPassage(\'' + p.id + '\')" title="Supprimer">🗑️</button>' +
         '</div>' +
       '</div>' +
@@ -1273,6 +1290,112 @@ window.insertGPSNotesEng = function() {
   toast('GPS inseres dans les notes');
 };
 
+
+// Parse une chaine GPS libre type "48.123, 3.456" -> {lat, lon} ou null
+function parseGPS(str) {
+  if (!str) return null;
+  const m = String(str).match(/(-?\d+[.,]\d+)\D+(-?\d+[.,]\d+)/);
+  if (!m) return null;
+  const lat = parseFloat(m[1].replace(',', '.'));
+  const lon = parseFloat(m[2].replace(',', '.'));
+  if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
+  return { lat, lon };
+}
+
+// Distance a vol d'oiseau en km entre deux points GPS
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Regroupe automatiquement les parcelles ayant un GPS renseigne en "sites"
+// par proximite geographique (parcelles a moins de SITE_THRESHOLD_KM = meme site).
+const SITE_THRESHOLD_KM = 3;
+function detectSites() {
+  const pts = S.parcelles.map(p => ({ nom: p.nom, gps: parseGPS(p.gps) })).filter(x => x.gps);
+  const clusters = [];
+  pts.forEach(pt => {
+    let found = null;
+    for (const c of clusters) {
+      if (haversineKm(pt.gps.lat, pt.gps.lon, c.coords.lat, c.coords.lon) < SITE_THRESHOLD_KM) { found = c; break; }
+    }
+    if (found) {
+      found._pts.push(pt.gps);
+      found.parcelles.push(pt.nom);
+      found.coords = { lat: found._pts.reduce((s,g)=>s+g.lat,0)/found._pts.length, lon: found._pts.reduce((s,g)=>s+g.lon,0)/found._pts.length };
+    } else {
+      clusters.push({ parcelles: [pt.nom], coords: pt.gps, _pts: [pt.gps] });
+    }
+  });
+  clusters.forEach((c,i) => { c.label = 'Site ' + (i+1) + ' (' + c.parcelles.join(', ') + ')'; });
+  return clusters;
+}
+
+// Date du dernier passage phyto (hors engrais) de la campagne en cours, au format DD/MM/YY
+function getLastPhytoDate() {
+  const list = cpPassages().filter(p => p.type !== 'engrais' && p.date);
+  let best = null, bestIso = '';
+  list.forEach(p => { const iso = toISO(p.date); if (iso && iso > bestIso) { bestIso = iso; best = p.date; } });
+  return best;
+}
+
+// Cumul de pluie (mm) pour un site, depuis refDateISO (inclus) jusqu'a aujourd'hui.
+// Utilise l'API gratuite Open-Meteo (sans cle). Limite technique : 92 jours en arriere max.
+async function fetchSiteRainfall(site, refDateISO) {
+  const today = new Date();
+  const refDate = new Date(refDateISO + 'T00:00:00');
+  let days = Math.round((today - refDate) / 86400000);
+  if (days < 0) days = 0;
+  if (days > 92) days = 92;
+  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + site.coords.lat + '&longitude=' + site.coords.lon +
+    '&daily=precipitation_sum&past_days=' + days + '&forecast_days=1&timezone=auto';
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('reponse HTTP ' + res.status);
+  const data = await res.json();
+  const dates = (data.daily && data.daily.time) || [];
+  const rains = (data.daily && data.daily.precipitation_sum) || [];
+  let total = 0;
+  dates.forEach((d,i) => { if (d >= refDateISO) total += (rains[i] || 0); });
+  return total;
+}
+
+// Fonction generique : calcule et affiche la pluviometrie par site dans l'element cible.
+// Si cardElId est fourni (tableau de bord), la carte est masquee tant qu'il n'y a pas
+// encore eu de premier traitement sur la campagne en cours.
+async function renderRainfallBlock(targetElId, cardElId) {
+  const el = document.getElementById(targetElId);
+  if (!el) return;
+  const card = cardElId ? document.getElementById(cardElId) : null;
+  const refDate = getLastPhytoDate();
+  if (!refDate) {
+    if (card) { card.style.display = 'none'; }
+    else { el.innerHTML = '<span style="font-size:12px;color:var(--gris);">Aucun traitement precedent sur cette campagne — pluviometrie non calculee.</span>'; }
+    return;
+  }
+  if (card) card.style.display = '';
+  const sites = detectSites();
+  if (!sites.length) {
+    el.innerHTML = '<span style="font-size:12px;color:var(--rouge);">Aucune parcelle avec GPS renseigne — impossible de calculer la pluviometrie.</span>';
+    return;
+  }
+  el.innerHTML = '<span style="font-size:12px;color:var(--gris);">Calcul en cours...</span>';
+  const refISO = toISO(refDate);
+  try {
+    const results = await Promise.all(sites.map(async s => ({ label: s.label, total: await fetchSiteRainfall(s, refISO) })));
+    const rows = results.map(r =>
+      '<div style="margin:2px 0;font-size:13px;"><strong>' + r.label + '</strong> : <span style="color:var(--vert);font-weight:600;">' + r.total.toFixed(1) + ' mm</span></div>'
+    ).join('');
+    el.innerHTML = '<div style="font-size:11px;color:var(--gris);margin-bottom:6px;">Depuis le dernier traitement (' + refDate + ') :</div>' + rows;
+  } catch(e) {
+    el.innerHTML = '<span style="font-size:12px;color:var(--rouge);">Erreur meteo : ' + e.message + '</span>';
+  }
+}
+
+window.renderRainfallZone = function(targetId) { renderRainfallBlock(targetId, null); };
+function renderRainfallCard() { renderRainfallBlock('rainfall-content', 'rainfall-card'); }
 
 window.selectAllParcelles = function(checked) {
   document.querySelectorAll('.parc-cb').forEach(cb => cb.checked = checked);
@@ -1541,8 +1664,8 @@ window.closeModal = function() {
 };
 
 // ── PASSAGE ──────────────────────────────────────────────────
-window.openPassageModal = function(pid) {
-  const p = pid ? S.passages.find(x => x.id === pid) : null;
+window.openPassageModal = function(pid, dupData) {
+  const p = dupData || (pid ? S.passages.find(x => x.id === pid) : null);
   const catNames = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(pr=>pr.cat)])];
   const parOpts = S.parcelles.map(pa =>
     '<option value="' + pa.nom + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' selected' : '') + '>' + pa.nom + '</option>'
@@ -1618,6 +1741,9 @@ window.openPassageModal = function(pid) {
         '<label>% de la surface traitee (desherbage localise, 100% si traitement total)</label>' +
         '<input type="number" id="f-pct-surface" min="1" max="100" value="' + (p && p.pourcentSurface ? p.pourcentSurface : 100) + '">' +
       '</div>' +
+      '<div style="margin-top:10px;" id="pluvio-form-wrap">' +
+        '<div id="pluvio-zone">🌧️ Pluviometrie : calcul en cours...</div>' +
+      '</div>' +
     '</div>' +
     '<div class="section-title">Produits appliques</div>' +
     prodsHTML +
@@ -1635,7 +1761,8 @@ window.openPassageModal = function(pid) {
     '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="f-notes" rows="3" placeholder="Conditions meteo...">' + (p?p.notes||'':'') + '</textarea></div>' +
     '<div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="insertGPSNotes()">📍 Inserer GPS parcelles</button></div>';
 
-  openModal(p ? 'Modifier le passage' : 'Nouveau passage', body, () => savePassage(pid));
+  openModal(pid ? 'Modifier le passage' : (dupData ? 'Nouveau passage (duplique)' : 'Nouveau passage'), body, () => savePassage(pid));
+  renderRainfallZone('pluvio-zone');
 };
 
 function prodLineHTML(cat, existing, catProds) {
@@ -1723,9 +1850,26 @@ window.delPassage = function(id) {
   });
 };
 
+// Duplique un passage existant (phyto ou engrais) : ouvre un formulaire "Nouveau"
+// pre-rempli avec les memes parcelles/produits, la date reste a verifier/modifier.
+window.duplicatePassage = function(id) {
+  const src = S.passages.find(x => x.id === id);
+  if (!src) { toast('Passage introuvable', true); return; }
+  const clone = JSON.parse(JSON.stringify(src));
+  delete clone.id;
+  if (src.type === 'engrais') {
+    clone.num = cpPassages().filter(x => x.type === 'engrais').length + 1;
+    openPassageEngraisModal(null, clone);
+  } else {
+    clone.num = cpPassages().filter(x => x.type !== 'engrais').length + 1;
+    openPassageModal(null, clone);
+  }
+  toast('Passage duplique — verifiez la date avant d\'enregistrer');
+};
+
 // ── PASSAGE ENGRAIS (formulaire dedie) ────────────────────────
-window.openPassageEngraisModal = function(pid) {
-  const p = pid ? S.passages.find(x => x.id === pid && x.type === 'engrais') : null;
+window.openPassageEngraisModal = function(pid, dupData) {
+  const p = dupData || (pid ? S.passages.find(x => x.id === pid && x.type === 'engrais') : null);
   const cats = [...new Set(S.engrais.map(eg => eg.categorie || 'Autre'))];
   const existingEng = p ? (p.engraisList||[]) : [];
 
@@ -1794,7 +1938,7 @@ window.openPassageEngraisModal = function(pid) {
     '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="fe-notes" rows="3" placeholder="Conditions, parcelle test...">' + (p?p.notes||'':'') + '</textarea></div>' +
     '<div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="insertGPSNotesEng()">📍 Inserer GPS parcelles</button></div>';
 
-  openModal(p ? 'Modifier le passage engrais' : 'Nouveau passage engrais', body, () => savePassageEngrais(pid));
+  openModal(pid ? 'Modifier le passage engrais' : (dupData ? 'Nouveau passage engrais (duplique)' : 'Nouveau passage engrais'), body, () => savePassageEngrais(pid));
 };
 
 window.selectAllParcellesEng = function(val) {
