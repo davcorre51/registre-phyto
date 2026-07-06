@@ -360,7 +360,7 @@ tr:hover td{background:var(--vert-xxl);}
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, getDocs, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -470,7 +470,9 @@ const S = {
   parcelles: [],     // propre a l'exploitation
   cultures: [],      // propre a l'exploitation (agricole)
   unsubs: [],
-  unsubBase: []      // listeners base commune
+  unsubBase: [],     // listeners base commune
+  pluvioData: {},    // cache en memoire de l'historique de pluie par site {siteKey: {label, jours}}
+  _pluvioReady: false
 };
 
 // ── CHEMINS FIRESTORE ────────────────────────────────────────
@@ -1164,6 +1166,11 @@ function renderPassages(cp) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Aucun passage - cliquez sur + Ajouter</div></div>';
     return;
   }
+  const sites = detectSites();
+  if (sites.length && !S._pluvioReady) {
+    ensureRainfallSync().then(() => { S._pluvioReady = true; render(); });
+  }
+  const phytoAsc = [...cp].filter(x => x.type !== 'engrais' && x.date).sort((a,b) => toISO(a.date).localeCompare(toISO(b.date)));
   el.innerHTML = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).map(p => {
     const isEng = p.type === 'engrais';
     let bodyHTML, rightBadge = '';
@@ -1179,10 +1186,27 @@ function renderPassages(cp) {
     const prods = p.produitsList || [];
     const byCat = {};
     prods.forEach(pr => { if (!byCat[pr.cat]) byCat[pr.cat] = []; byCat[pr.cat].push(pr); });
+    const pluieHTML = (function(){
+      if (!sites.length || !S.pluvioData) return '';
+      const idx = phytoAsc.findIndex(x => x.id === p.id);
+      if (idx <= 0) return '';
+      const prev = phytoAsc[idx - 1];
+      const relevant = sitesForParcelles(p.parcelles || [], sites);
+      if (!relevant.length) return '';
+      const startISO = toISO(prev.date), endISO = toISO(p.date);
+      const parts = relevant.map(s => {
+        const data = S.pluvioData[s.key];
+        if (!data) return null;
+        const total = sumRain(data.jours, startISO, endISO);
+        return s.label + ' : ' + total.toFixed(1) + ' mm';
+      }).filter(Boolean);
+      if (!parts.length) return '';
+      return '<div style="margin-top:6px;font-size:12px;color:var(--gris);">🌧️ Depuis le passage precedent (' + prev.date + ') : ' + parts.join(' · ') + '</div>';
+    })();
     bodyHTML = Object.entries(byCat).map(([cat,list]) =>
       '<div class="prod-cat-title">' + cat + '</div>' +
       list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (pr.qte ? '<strong>' + pr.qte + '</strong> ' + (pr.unite||'') : (pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;margin-left:auto;">DRE ' + pr.dre + 'h</span>' : '<span style="min-width:50px;"></span>') + '</div>').join('')
-    ).join('') + (function(){ var pctTxt = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : ''; var combined = [pctTxt, p.notes||''].filter(Boolean).join(' — '); return combined ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + combined + '</div>' : ''; })();
+    ).join('') + (function(){ var pctTxt = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : ''; var combined = [pctTxt, p.notes||''].filter(Boolean).join(' — '); return combined ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + combined + '</div>' : ''; })() + pluieHTML;
     rightBadge = (function(){ try { var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; var dreB = v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; var iftV = (p.ift!==undefined && p.ift!==null ? p.ift : calcIFT(p)); var iftB = Number.isFinite(iftV) && iftV ? '<span class="badge" style="background:var(--vert-xxl);color:var(--vert);">IFT '+iftV.toFixed(2)+'</span>' : ''; var pctB = (p.pourcentSurface && p.pourcentSurface < 100) ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">'+p.pourcentSurface+'% surface</span>' : ''; var maxDar=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dar,10)||0);},0); var darB = maxDar ? '<span class="badge" style="background:#e7e0ff;color:#5b3fd4;" title="Recolte possible sans risque a partir de cette date, compte tenu du DAR le plus long des produits appliques">DAR : recolte des '+addDaysToDate(p.date, maxDar)+'</span>' : ''; return dreB+iftB+pctB+darB; } catch(e) { console.error('Erreur affichage badge passage', p.id, e); return ''; } })();
     }
 
@@ -1311,6 +1335,11 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Identifiant stable et lisible a partir d'un nom de parcelle
+function slugify(str) {
+  return String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+}
+
 // Regroupe automatiquement les parcelles ayant un GPS renseigne en "sites"
 // par proximite geographique (parcelles a moins de SITE_THRESHOLD_KM = meme site).
 const SITE_THRESHOLD_KM = 3;
@@ -1330,7 +1359,10 @@ function detectSites() {
       clusters.push({ parcelles: [pt.nom], coords: pt.gps, _pts: [pt.gps] });
     }
   });
-  clusters.forEach((c,i) => { c.label = 'Site ' + (i+1) + ' (' + c.parcelles.join(', ') + ')'; });
+  clusters.forEach((c,i) => {
+    c.label = 'Site ' + (i+1) + ' (' + c.parcelles.join(', ') + ')';
+    c.key = 'site-' + slugify([...c.parcelles].sort()[0]);
+  });
   return clusters;
 }
 
@@ -1342,56 +1374,145 @@ function getLastPhytoDate() {
   return best;
 }
 
-// Cumul de pluie (mm) pour un site, depuis refDateISO (inclus) jusqu'a aujourd'hui.
-// Utilise l'API gratuite Open-Meteo (sans cle). Limite technique : 92 jours en arriere max.
-async function fetchSiteRainfall(site, refDateISO) {
-  const today = new Date();
-  const refDate = new Date(refDateISO + 'T00:00:00');
-  let days = Math.round((today - refDate) / 86400000);
-  if (days < 0) days = 0;
-  if (days > 92) days = 92;
-  const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + site.coords.lat + '&longitude=' + site.coords.lon +
-    '&daily=precipitation_sum&past_days=' + days + '&forecast_days=1&timezone=auto';
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('reponse HTTP ' + res.status);
-  const data = await res.json();
-  const dates = (data.daily && data.daily.time) || [];
-  const rains = (data.daily && data.daily.precipitation_sum) || [];
+function addOneDayISO(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0,10);
+}
+
+// Somme les mm enregistres dans une carte {date: mm} entre deux dates ISO incluses
+function sumRain(joursMap, startISO, endISO) {
   let total = 0;
-  dates.forEach((d,i) => { if (d >= refDateISO) total += (rains[i] || 0); });
+  Object.keys(joursMap || {}).forEach(d => { if (d >= startISO && d <= endISO) total += (joursMap[d] || 0); });
   return total;
 }
 
-// Fonction generique : calcule et affiche la pluviometrie par site dans l'element cible.
-// Si cardElId est fourni (tableau de bord), la carte est masquee tant qu'il n'y a pas
-// encore eu de premier traitement sur la campagne en cours.
-async function renderRainfallBlock(targetElId, cardElId) {
+// Recupere les precipitations quotidiennes (mm) entre startISO et endISO (inclus) pour un point GPS.
+// Utilise l'API prevision (past_days) si la periode est recente (<=90j), sinon l'API archive
+// (aucune limite de duree, mais ~5j de decalage sur les donnees les plus recentes, completees
+// par l'API prevision pour cette toute derniere periode).
+async function fetchDailyPrecip(lat, lon, startISO, endISO) {
+  if (!startISO || startISO > endISO) return {};
+  const results = {};
+  const todayISO = new Date().toISOString().slice(0,10);
+  const daysSinceStart = Math.round((new Date(todayISO) - new Date(startISO)) / 86400000);
+  if (daysSinceStart <= 90) {
+    const days = Math.min(92, daysSinceStart + 2);
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+      '&daily=precipitation_sum&past_days=' + days + '&forecast_days=1&timezone=auto';
+    const data = await (await fetch(url)).json();
+    ((data.daily && data.daily.time) || []).forEach((d,i) => {
+      if (d >= startISO && d <= endISO) results[d] = data.daily.precipitation_sum[i] || 0;
+    });
+  } else {
+    const archiveEndDate = new Date(); archiveEndDate.setDate(archiveEndDate.getDate() - 5);
+    const archiveEndISO = archiveEndDate.toISOString().slice(0,10);
+    if (archiveEndISO >= startISO) {
+      const url1 = 'https://archive-api.open-meteo.com/v1/archive?latitude=' + lat + '&longitude=' + lon +
+        '&start_date=' + startISO + '&end_date=' + archiveEndISO + '&daily=precipitation_sum&timezone=auto';
+      const d1 = await (await fetch(url1)).json();
+      ((d1.daily && d1.daily.time) || []).forEach((d,i) => { results[d] = d1.daily.precipitation_sum[i] || 0; });
+    }
+    const url2 = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+      '&daily=precipitation_sum&past_days=7&forecast_days=1&timezone=auto';
+    const d2 = await (await fetch(url2)).json();
+    ((d2.daily && d2.daily.time) || []).forEach((d,i) => {
+      if (d >= startISO && d <= endISO) results[d] = d2.daily.precipitation_sum[i] || 0;
+    });
+  }
+  return results;
+}
+
+// Synchronise (une fois par connexion) l'historique quotidien de pluie de chaque site,
+// stocke dans exploitations/{id}/pluviometrie/{siteKey}_{annee}, en ne recuperant que
+// les jours manquants depuis la derniere synchronisation.
+let rainfallSyncPromise = null;
+function ensureRainfallSync() {
+  if (!rainfallSyncPromise) {
+    rainfallSyncPromise = syncRainfallHistory().catch(e => { console.error('Erreur synchronisation pluviometrie', e); });
+  }
+  return rainfallSyncPromise;
+}
+function resetRainfallSync() { rainfallSyncPromise = null; S.pluvioData = {}; S._pluvioReady = false; }
+
+async function syncRainfallHistory() {
+  const eid = S.currentId;
+  if (!eid) return;
+  const sites = detectSites();
+  if (!sites.length) return;
+  S.pluvioData = S.pluvioData || {};
+  const todayISO = new Date().toISOString().slice(0,10);
+  const yearStr = todayISO.slice(0,4);
+  const jan1ISO = yearStr + '-01-01';
+  for (const site of sites) {
+    const docId = site.key + '_' + yearStr;
+    let existingJours = {};
+    try {
+      const snap = await getDoc(subdoc(eid, 'pluviometrie', docId));
+      if (snap.exists()) existingJours = snap.data().jours || {};
+    } catch(e) { console.error('Lecture historique pluviometrie', site.key, e); }
+    const storedDates = Object.keys(existingJours).sort();
+    const lastStored = storedDates.length ? storedDates[storedDates.length - 1] : null;
+    const startFetch = lastStored ? addOneDayISO(lastStored) : jan1ISO;
+    let newJours = {};
+    if (startFetch <= todayISO) {
+      try { newJours = await fetchDailyPrecip(site.coords.lat, site.coords.lon, startFetch, todayISO); }
+      catch(e) { console.error('Erreur meteo site', site.key, e); }
+    }
+    const merged = Object.assign({}, existingJours, newJours);
+    S.pluvioData[site.key] = { label: site.label, parcelles: site.parcelles, jours: merged };
+    if (Object.keys(newJours).length) {
+      try {
+        await setDoc(subdoc(eid, 'pluviometrie', docId),
+          { site: site.key, label: site.label, annee: yearStr, jours: merged, updatedAt: serverTimestamp() },
+          { merge: true });
+      } catch(e) { console.error('Ecriture historique pluviometrie', site.key, e); }
+    }
+  }
+}
+
+// Sites (avec cles) touches par une liste de noms de parcelles
+function sitesForParcelles(parcelNoms, sites) {
+  return sites.filter(s => s.parcelles.some(n => (parcelNoms||[]).includes(n)));
+}
+
+// Fonction generique : affiche, dans l'element cible, le cumul de pluie par site
+// depuis le dernier traitement (si un traitement existe cette campagne) et depuis
+// le 1er janvier. cardElId (optionnel, tableau de bord) est masque uniquement en
+// l'absence de site detectable (aucune parcelle avec GPS).
+function renderRainfallBlock(targetElId, cardElId) {
   const el = document.getElementById(targetElId);
   if (!el) return;
   const card = cardElId ? document.getElementById(cardElId) : null;
-  const refDate = getLastPhytoDate();
-  if (!refDate) {
-    if (card) { card.style.display = 'none'; }
-    else { el.innerHTML = '<span style="font-size:12px;color:var(--gris);">Aucun traitement precedent sur cette campagne — pluviometrie non calculee.</span>'; }
+  const sites = detectSites();
+  if (!sites.length) {
+    if (card) card.style.display = 'none';
+    else el.innerHTML = '<span style="font-size:12px;color:var(--rouge);">Aucune parcelle avec GPS renseigne — impossible de calculer la pluviometrie.</span>';
     return;
   }
   if (card) card.style.display = '';
-  const sites = detectSites();
-  if (!sites.length) {
-    el.innerHTML = '<span style="font-size:12px;color:var(--rouge);">Aucune parcelle avec GPS renseigne — impossible de calculer la pluviometrie.</span>';
-    return;
-  }
-  el.innerHTML = '<span style="font-size:12px;color:var(--gris);">Calcul en cours...</span>';
-  const refISO = toISO(refDate);
-  try {
-    const results = await Promise.all(sites.map(async s => ({ label: s.label, total: await fetchSiteRainfall(s, refISO) })));
-    const rows = results.map(r =>
-      '<div style="margin:2px 0;font-size:13px;"><strong>' + r.label + '</strong> : <span style="color:var(--vert);font-weight:600;">' + r.total.toFixed(1) + ' mm</span></div>'
-    ).join('');
-    el.innerHTML = '<div style="font-size:11px;color:var(--gris);margin-bottom:6px;">Depuis le dernier traitement (' + refDate + ') :</div>' + rows;
-  } catch(e) {
-    el.innerHTML = '<span style="font-size:12px;color:var(--rouge);">Erreur meteo : ' + e.message + '</span>';
-  }
+  const refDate = getLastPhytoDate();
+  el.innerHTML = '<span style="font-size:12px;color:var(--gris);">Chargement...</span>';
+  ensureRainfallSync().then(() => {
+    const el2 = document.getElementById(targetElId);
+    if (!el2) return;
+    const todayISO = new Date().toISOString().slice(0,10);
+    const jan1ISO = todayISO.slice(0,4) + '-01-01';
+    const rows = sites.map(s => {
+      const data = S.pluvioData[s.key] || { jours: {} };
+      const depuisAnnee = sumRain(data.jours, jan1ISO, todayISO);
+      let ligneTraitement = '';
+      if (refDate) {
+        const refISO = toISO(refDate);
+        const depuisTraitement = sumRain(data.jours, refISO, todayISO);
+        ligneTraitement = '<span style="color:var(--vert);font-weight:600;">' + depuisTraitement.toFixed(1) + ' mm</span> depuis le dernier traitement (' + refDate + ') · ';
+      }
+      return '<div style="margin:4px 0;font-size:13px;"><strong>' + s.label + '</strong><br>' +
+        ligneTraitement +
+        '<span style="color:var(--gris);font-size:12px;">' + depuisAnnee.toFixed(1) + ' mm depuis le 1er janvier</span></div>';
+    }).join('');
+    el2.innerHTML = rows;
+  });
 }
 
 window.renderRainfallZone = function(targetId) { renderRainfallBlock(targetId, null); };
@@ -2305,6 +2426,7 @@ window.switchExploit = function(id) {
   if (id === S.currentId) return;
   S.currentId = id;
   S.datesRecolte = {}; // Reset en memoire, Firebase va repeupler via listener
+  resetRainfallSync();
   listenExploit();
   toast('Exploitation activee');
 };
