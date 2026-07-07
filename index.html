@@ -469,7 +469,7 @@ const S = {
   categories: [],    // depuis base commune
   parcelles: [],     // propre a l'exploitation
   cultures: [],      // propre a l'exploitation (agricole)
-  sitesMeteo: [],    // propre a l'exploitation (communes suivies pour la pluviometrie)
+  sitesMeteoByExploit: {}, // {exploitationId: [sites...]} - jamais partage entre exploitations, meme en cas de callback tardif
   unsubs: [],
   unsubBase: [],     // listeners base commune
   pluvioData: {}    // cache en memoire de l'historique de pluie par site {siteKey: {label, jours}}
@@ -989,12 +989,11 @@ function listenExploit() {
 
   // Sites meteo (communes suivies pour la pluviometrie) : propres a l'exploitation
   S.unsubs.push(onSnapshot(sub(eid,'sitesMeteo'), snap => {
-    if (S.currentId !== eid) return;
-    S.sitesMeteo = snap.docs.map(d => ({id: d.id, ...d.data()}));
-    S.sitesMeteo.sort((a,b) => (a.nom||'').localeCompare(b.nom||''));
+    const list = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    list.sort((a,b) => (a.nom||'').localeCompare(b.nom||''));
+    S.sitesMeteoByExploit[eid] = list; // stocke sous la cle de CETTE exploitation, jamais dans un etat partage
     delete rainfallSyncPromises[eid]; // la liste des sites a change, on force un nouveau cycle de synchro
-    S.pluvioData = {};
-    render();
+    if (S.currentId === eid) { S.pluvioData = {}; render(); }
   }));
 
   // Dates de récolte par campagne (propres à l'exploitation)
@@ -1311,7 +1310,7 @@ window.insertGPSNotesEng = function() {
 // Remplace l'ancien regroupement automatique par proximite GPS des parcelles, qui
 // pouvait faire collisionner deux sites reels trop proches apres arrondi.
 function getSitesMeteo() {
-  return (S.sitesMeteo || []).map(s => ({
+  return (S.sitesMeteoByExploit[S.currentId] || []).map(s => ({
     key: s.id,
     label: s.nom,
     coords: { lat: s.lat, lon: s.lon }
@@ -2395,7 +2394,7 @@ window.delApplicateur = function(id, nom) {
 
 // ── SITES METEO (communes suivies pour la pluviometrie) ──
 function renderSitesMeteoSection() {
-  const sites = S.sitesMeteo || [];
+  const sites = S.sitesMeteoByExploit[S.currentId] || [];
   return '<div style="margin-top:14px;border-top:1px solid var(--gris-l);padding-top:14px;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
       '<div style="font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.5px;">🌧️ Sites meteo (pluviometrie)</div>' +
@@ -2420,7 +2419,7 @@ function renderSitesMeteoSection() {
 }
 
 window.openSiteMeteoModal = function(sid) {
-  const s = sid ? (S.sitesMeteo || []).find(x => x.id === sid) : null;
+  const s = sid ? (S.sitesMeteoByExploit[S.currentId] || []).find(x => x.id === sid) : null;
   const body =
     '<div class="form-grid">' +
       '<div class="form-group full"><label>Commune *</label><input type="text" id="fsm-nom" value="' + (s?s.nom:'') + '" placeholder="ex: Chablis"></div>' +
