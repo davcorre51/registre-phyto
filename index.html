@@ -1249,10 +1249,10 @@ function renderPassages(cp) {
           var qualif = recolteConfirmee ? 'confirmee' : 'previsionnelle';
           if (recolteISO && darSafeISO > recolteISO) {
             var recolteFR = fmtDate(recolteISO);
-            darB = '<span class="badge badge-rouge" title="Le DAR de ce traitement depasse la date de recolte '+qualif+' pour cette campagne">⚠️ DAR non respecte (recolte '+qualif+' le '+recolteFR+' — recolte sans risque des '+darSafeFR+')</span>';
+            darB = '<span class="badge badge-rouge" title="Recolte '+qualif+' le '+recolteFR+' — recolte sans risque seulement a partir du '+darSafeFR+'">DAR NON</span>';
           } else if (recolteISO) {
             var recolteFR2 = fmtDate(recolteISO);
-            darB = '<span class="badge" style="background:#e0f5e9;color:#1a7a45;" title="Delai avant recolte respecte compte tenu de la date de recolte '+qualif+' pour cette campagne">DAR OK : recolte des '+darSafeFR+' (recolte '+qualif+' le '+recolteFR2+')</span>';
+            darB = '<span class="badge" style="background:#e0f5e9;color:#1a7a45;" title="Recolte sans risque des '+darSafeFR+' (recolte '+qualif+' le '+recolteFR2+')">DAR OK</span>';
           } else {
             darB = '<span class="badge" style="background:#e7e0ff;color:#5b3fd4;" title="Recolte possible sans risque a partir de cette date, compte tenu du DAR le plus long des produits appliques">DAR : recolte des '+darSafeFR+'</span>';
           }
@@ -1775,7 +1775,13 @@ function renderExploitations() {
     el.innerHTML = '<div class="empty"><div class="empty-text">Aucune exploitation</div></div>';
     return;
   }
-  el.innerHTML = S.exploitations.map(e =>
+  // La derniere exploitation consultee (active) est affichee en premier ; l'ordre des autres est conserve.
+  const sorted = [...S.exploitations].sort((a,b) => {
+    if (a.id === S.currentId) return -1;
+    if (b.id === S.currentId) return 1;
+    return 0;
+  });
+  el.innerHTML = sorted.map(e =>
     '<div class="exploit-card ' + (e.id === S.currentId ? 'active-exploit' : '') + '">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;">' +
         '<div>' +
