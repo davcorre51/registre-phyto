@@ -1168,7 +1168,7 @@ function renderPassages(cp) {
   }
   const sites = detectSites();
   if (sites.length && !S._pluvioReady) {
-    ensureRainfallSync().then(() => { S._pluvioReady = true; render(); });
+    ensureRainfallSync().then(result => { if (result && result.ok) { S._pluvioReady = true; render(); } });
   }
   const phytoAsc = [...cp].filter(x => x.type !== 'engrais' && x.date).sort((a,b) => toISO(a.date).localeCompare(toISO(b.date)));
   el.innerHTML = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).map(p => {
@@ -1335,11 +1335,6 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Identifiant stable et lisible a partir d'un nom de parcelle
-function slugify(str) {
-  return String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-}
-
 // Regroupe automatiquement les parcelles ayant un GPS renseigne en "sites"
 // par proximite geographique (parcelles a moins de SITE_THRESHOLD_KM = meme site).
 const SITE_THRESHOLD_KM = 3;
@@ -1361,7 +1356,9 @@ function detectSites() {
   });
   clusters.forEach((c,i) => {
     c.label = 'Site ' + (i+1) + ' (' + c.parcelles.join(', ') + ')';
-    c.key = 'site-' + slugify([...c.parcelles].sort()[0]);
+    // Cle basee sur le centroide (moyenne des GPS du site), arrondi grossierement (~11km)
+    // pour rester stable meme si une nouvelle parcelle proche fait legerement bouger la moyenne.
+    c.key = 'site-' + c.coords.lat.toFixed(1) + '_' + c.coords.lon.toFixed(1);
   });
   return clusters;
 }
@@ -1400,8 +1397,11 @@ async function fetchDailyPrecip(lat, lon, startISO, endISO) {
     const days = Math.min(92, daysSinceStart + 2);
     const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
       '&daily=precipitation_sum&past_days=' + days + '&forecast_days=1&timezone=auto';
-    const data = await (await fetch(url)).json();
-    ((data.daily && data.daily.time) || []).forEach((d,i) => {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('API prevision : reponse HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.daily || !data.daily.time) throw new Error('API prevision : reponse inattendue');
+    (data.daily.time || []).forEach((d,i) => {
       if (d >= startISO && d <= endISO) results[d] = data.daily.precipitation_sum[i] || 0;
     });
   } else {
@@ -1410,13 +1410,19 @@ async function fetchDailyPrecip(lat, lon, startISO, endISO) {
     if (archiveEndISO >= startISO) {
       const url1 = 'https://archive-api.open-meteo.com/v1/archive?latitude=' + lat + '&longitude=' + lon +
         '&start_date=' + startISO + '&end_date=' + archiveEndISO + '&daily=precipitation_sum&timezone=auto';
-      const d1 = await (await fetch(url1)).json();
-      ((d1.daily && d1.daily.time) || []).forEach((d,i) => { results[d] = d1.daily.precipitation_sum[i] || 0; });
+      const res1 = await fetch(url1);
+      if (!res1.ok) throw new Error('API archive : reponse HTTP ' + res1.status);
+      const d1 = await res1.json();
+      if (!d1.daily || !d1.daily.time) throw new Error('API archive : reponse inattendue');
+      (d1.daily.time || []).forEach((d,i) => { results[d] = d1.daily.precipitation_sum[i] || 0; });
     }
     const url2 = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
       '&daily=precipitation_sum&past_days=7&forecast_days=1&timezone=auto';
-    const d2 = await (await fetch(url2)).json();
-    ((d2.daily && d2.daily.time) || []).forEach((d,i) => {
+    const res2 = await fetch(url2);
+    if (!res2.ok) throw new Error('API prevision : reponse HTTP ' + res2.status);
+    const d2 = await res2.json();
+    if (!d2.daily || !d2.daily.time) throw new Error('API prevision : reponse inattendue');
+    (d2.daily.time || []).forEach((d,i) => {
       if (d >= startISO && d <= endISO) results[d] = d2.daily.precipitation_sum[i] || 0;
     });
   }
@@ -1426,17 +1432,24 @@ async function fetchDailyPrecip(lat, lon, startISO, endISO) {
 // Synchronise (une fois par connexion) l'historique quotidien de pluie de chaque site,
 // stocke dans exploitations/{id}/pluviometrie/{siteKey}_{annee}, en ne recuperant que
 // les jours manquants depuis la derniere synchronisation.
-let rainfallSyncPromise = null;
+let rainfallSyncPromises = {}; // une promesse par exploitation (evite qu'une synchro pour la mauvaise exploitation reste figee)
 function ensureRainfallSync() {
-  if (!rainfallSyncPromise) {
-    rainfallSyncPromise = syncRainfallHistory().catch(e => { console.error('Erreur synchronisation pluviometrie', e); });
-  }
-  return rainfallSyncPromise;
-}
-function resetRainfallSync() { rainfallSyncPromise = null; S.pluvioData = {}; S._pluvioReady = false; }
-
-async function syncRainfallHistory() {
   const eid = S.currentId;
+  if (!eid) return Promise.resolve({ ok: false });
+  if (!rainfallSyncPromises[eid]) {
+    rainfallSyncPromises[eid] = syncRainfallHistory(eid)
+      .then(() => ({ ok: true }))
+      .catch(e => {
+        console.error('Erreur synchronisation pluviometrie', e);
+        delete rainfallSyncPromises[eid]; // on ne fige pas l'echec : la prochaine tentative reessaiera
+        return { ok: false, error: e };
+      });
+  }
+  return rainfallSyncPromises[eid];
+}
+function resetRainfallSync() { rainfallSyncPromises = {}; S.pluvioData = {}; S._pluvioReady = false; }
+
+async function syncRainfallHistory(eid) {
   if (!eid) return;
   const sites = detectSites();
   if (!sites.length) return;
@@ -1456,8 +1469,9 @@ async function syncRainfallHistory() {
     const startFetch = lastStored ? addOneDayISO(lastStored) : jan1ISO;
     let newJours = {};
     if (startFetch <= todayISO) {
-      try { newJours = await fetchDailyPrecip(site.coords.lat, site.coords.lon, startFetch, todayISO); }
-      catch(e) { console.error('Erreur meteo site', site.key, e); }
+      // Pas de try/catch ici : une erreur doit remonter pour permettre un nouvel essai
+      // au prochain appel, plutot que d'afficher silencieusement 0 mm en cas d'echec.
+      newJours = await fetchDailyPrecip(site.coords.lat, site.coords.lon, startFetch, todayISO);
     }
     const merged = Object.assign({}, existingJours, newJours);
     S.pluvioData[site.key] = { label: site.label, parcelles: site.parcelles, jours: merged };
@@ -1493,9 +1507,13 @@ function renderRainfallBlock(targetElId, cardElId) {
   if (card) card.style.display = '';
   const refDate = getLastPhytoDate();
   el.innerHTML = '<span style="font-size:12px;color:var(--gris);">Chargement...</span>';
-  ensureRainfallSync().then(() => {
+  ensureRainfallSync().then(result => {
     const el2 = document.getElementById(targetElId);
     if (!el2) return;
+    if (result && result.ok === false) {
+      el2.innerHTML = '<span style="font-size:12px;color:var(--rouge);">Impossible de recuperer la pluviometrie pour le moment (reseau ou service meteo indisponible). Nouvel essai a la prochaine consultation.</span>';
+      return;
+    }
     const todayISO = new Date().toISOString().slice(0,10);
     const jan1ISO = todayISO.slice(0,4) + '-01-01';
     const rows = sites.map(s => {
