@@ -469,10 +469,10 @@ const S = {
   categories: [],    // depuis base commune
   parcelles: [],     // propre a l'exploitation
   cultures: [],      // propre a l'exploitation (agricole)
+  sitesMeteo: [],    // propre a l'exploitation (communes suivies pour la pluviometrie)
   unsubs: [],
   unsubBase: [],     // listeners base commune
-  pluvioData: {},    // cache en memoire de l'historique de pluie par site {siteKey: {label, jours}}
-  _pluvioReady: false
+  pluvioData: {}    // cache en memoire de l'historique de pluie par site {siteKey: {label, jours}}
 };
 
 // ── CHEMINS FIRESTORE ────────────────────────────────────────
@@ -984,6 +984,15 @@ function listenExploit() {
     S.cultures.sort((a,b) => a.nom.localeCompare(b.nom));
   }));
 
+  // Sites meteo (communes suivies pour la pluviometrie) : propres a l'exploitation
+  S.unsubs.push(onSnapshot(sub(eid,'sitesMeteo'), snap => {
+    S.sitesMeteo = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.sitesMeteo.sort((a,b) => (a.nom||'').localeCompare(b.nom||''));
+    delete rainfallSyncPromises[eid]; // la liste des sites a change, on force un nouveau cycle de synchro
+    S.pluvioData = {};
+    render();
+  }));
+
   // Dates de récolte par campagne (propres à l'exploitation)
   S.unsubs.push(onSnapshot(sub(eid,'campagnes'), snap => {
     S.datesRecolte = {};
@@ -1166,11 +1175,6 @@ function renderPassages(cp) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Aucun passage - cliquez sur + Ajouter</div></div>';
     return;
   }
-  const sites = detectSites();
-  if (sites.length && !S._pluvioReady) {
-    ensureRainfallSync().then(result => { if (result && result.ok) { S._pluvioReady = true; render(); } });
-  }
-  const phytoAsc = [...cp].filter(x => x.type !== 'engrais' && x.date).sort((a,b) => toISO(a.date).localeCompare(toISO(b.date)));
   el.innerHTML = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).map(p => {
     const isEng = p.type === 'engrais';
     let bodyHTML, rightBadge = '';
@@ -1186,27 +1190,10 @@ function renderPassages(cp) {
     const prods = p.produitsList || [];
     const byCat = {};
     prods.forEach(pr => { if (!byCat[pr.cat]) byCat[pr.cat] = []; byCat[pr.cat].push(pr); });
-    const pluieHTML = (function(){
-      if (!sites.length || !S.pluvioData) return '';
-      const idx = phytoAsc.findIndex(x => x.id === p.id);
-      if (idx <= 0) return '';
-      const prev = phytoAsc[idx - 1];
-      const relevant = sitesForParcelles(p.parcelles || [], sites);
-      if (!relevant.length) return '';
-      const startISO = toISO(prev.date), endISO = toISO(p.date);
-      const parts = relevant.map(s => {
-        const data = S.pluvioData[s.key];
-        if (!data) return null;
-        const total = sumRain(data.jours, startISO, endISO);
-        return s.label + ' : ' + total.toFixed(1) + ' mm';
-      }).filter(Boolean);
-      if (!parts.length) return '';
-      return '<div style="margin-top:6px;font-size:12px;color:var(--gris);">🌧️ Depuis le passage precedent (' + prev.date + ') : ' + parts.join(' · ') + '</div>';
-    })();
     bodyHTML = Object.entries(byCat).map(([cat,list]) =>
       '<div class="prod-cat-title">' + cat + '</div>' +
       list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (pr.qte ? '<strong>' + pr.qte + '</strong> ' + (pr.unite||'') : (pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;margin-left:auto;">DRE ' + pr.dre + 'h</span>' : '<span style="min-width:50px;"></span>') + '</div>').join('')
-    ).join('') + (function(){ var pctTxt = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : ''; var combined = [pctTxt, p.notes||''].filter(Boolean).join(' — '); return combined ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + combined + '</div>' : ''; })() + pluieHTML;
+    ).join('') + (function(){ var pctTxt = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : ''; var combined = [pctTxt, p.notes||''].filter(Boolean).join(' — '); return combined ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + combined + '</div>' : ''; })();
     rightBadge = (function(){ try { var d=parseInt(p.dre,10)||0; var m=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dre,10)||0);},d); var v=m||d; var dreB = v?'<span class="badge badge-rouge">DRE '+v+'h</span>':''; var iftV = (p.ift!==undefined && p.ift!==null ? p.ift : calcIFT(p)); var iftB = Number.isFinite(iftV) && iftV ? '<span class="badge" style="background:var(--vert-xxl);color:var(--vert);">IFT '+iftV.toFixed(2)+'</span>' : ''; var pctB = (p.pourcentSurface && p.pourcentSurface < 100) ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">'+p.pourcentSurface+'% surface</span>' : ''; var maxDar=(p.produitsList||[]).reduce(function(mx,pr){return Math.max(mx,parseInt(pr.dar,10)||0);},0); var darB = maxDar ? '<span class="badge" style="background:#e7e0ff;color:#5b3fd4;" title="Recolte possible sans risque a partir de cette date, compte tenu du DAR le plus long des produits appliques">DAR : recolte des '+addDaysToDate(p.date, maxDar)+'</span>' : ''; return dreB+iftB+pctB+darB; } catch(e) { console.error('Erreur affichage badge passage', p.id, e); return ''; } })();
     }
 
@@ -1315,52 +1302,15 @@ window.insertGPSNotesEng = function() {
 };
 
 
-// Parse une chaine GPS libre type "48.123, 3.456" -> {lat, lon} ou null
-function parseGPS(str) {
-  if (!str) return null;
-  const m = String(str).match(/(-?\d+[.,]\d+)\D+(-?\d+[.,]\d+)/);
-  if (!m) return null;
-  const lat = parseFloat(m[1].replace(',', '.'));
-  const lon = parseFloat(m[2].replace(',', '.'));
-  if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
-  return { lat, lon };
-}
-
-// Distance a vol d'oiseau en km entre deux points GPS
-function haversineKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-// Regroupe automatiquement les parcelles ayant un GPS renseigne en "sites"
-// par proximite geographique (parcelles a moins de SITE_THRESHOLD_KM = meme site).
-const SITE_THRESHOLD_KM = 3;
-function detectSites() {
-  const pts = S.parcelles.map(p => ({ nom: p.nom, gps: parseGPS(p.gps) })).filter(x => x.gps);
-  const clusters = [];
-  pts.forEach(pt => {
-    let found = null;
-    for (const c of clusters) {
-      if (haversineKm(pt.gps.lat, pt.gps.lon, c.coords.lat, c.coords.lon) < SITE_THRESHOLD_KM) { found = c; break; }
-    }
-    if (found) {
-      found._pts.push(pt.gps);
-      found.parcelles.push(pt.nom);
-      found.coords = { lat: found._pts.reduce((s,g)=>s+g.lat,0)/found._pts.length, lon: found._pts.reduce((s,g)=>s+g.lon,0)/found._pts.length };
-    } else {
-      clusters.push({ parcelles: [pt.nom], coords: pt.gps, _pts: [pt.gps] });
-    }
-  });
-  clusters.forEach((c,i) => {
-    c.label = 'Site ' + (i+1) + ' (' + c.parcelles.join(', ') + ')';
-    // Cle basee sur le centroide (moyenne des GPS du site), arrondi grossierement (~11km)
-    // pour rester stable meme si une nouvelle parcelle proche fait legerement bouger la moyenne.
-    c.key = 'site-' + c.coords.lat.toFixed(1) + '_' + c.coords.lon.toFixed(1);
-  });
-  return clusters;
+// Sites meteo configures manuellement par l'utilisateur (exploitations/{id}/sitesMeteo).
+// Remplace l'ancien regroupement automatique par proximite GPS des parcelles, qui
+// pouvait faire collisionner deux sites reels trop proches apres arrondi.
+function getSitesMeteo() {
+  return (S.sitesMeteo || []).map(s => ({
+    key: s.id,
+    label: s.nom,
+    coords: { lat: s.lat, lon: s.lon }
+  }));
 }
 
 // Date du dernier passage phyto (hors engrais) de la campagne en cours, au format DD/MM/YY
@@ -1447,11 +1397,11 @@ function ensureRainfallSync() {
   }
   return rainfallSyncPromises[eid];
 }
-function resetRainfallSync() { rainfallSyncPromises = {}; S.pluvioData = {}; S._pluvioReady = false; }
+function resetRainfallSync() { rainfallSyncPromises = {}; S.pluvioData = {}; }
 
 async function syncRainfallHistory(eid) {
   if (!eid) return;
-  const sites = detectSites();
+  const sites = getSitesMeteo();
   if (!sites.length) return;
   S.pluvioData = S.pluvioData || {};
   const todayISO = new Date().toISOString().slice(0,10);
@@ -1474,7 +1424,7 @@ async function syncRainfallHistory(eid) {
       newJours = await fetchDailyPrecip(site.coords.lat, site.coords.lon, startFetch, todayISO);
     }
     const merged = Object.assign({}, existingJours, newJours);
-    S.pluvioData[site.key] = { label: site.label, parcelles: site.parcelles, jours: merged };
+    S.pluvioData[site.key] = { label: site.label, jours: merged };
     if (Object.keys(newJours).length) {
       try {
         await setDoc(subdoc(eid, 'pluviometrie', docId),
@@ -1485,23 +1435,18 @@ async function syncRainfallHistory(eid) {
   }
 }
 
-// Sites (avec cles) touches par une liste de noms de parcelles
-function sitesForParcelles(parcelNoms, sites) {
-  return sites.filter(s => s.parcelles.some(n => (parcelNoms||[]).includes(n)));
-}
-
 // Fonction generique : affiche, dans l'element cible, le cumul de pluie par site
 // depuis le dernier traitement (si un traitement existe cette campagne) et depuis
 // le 1er janvier. cardElId (optionnel, tableau de bord) est masque uniquement en
-// l'absence de site detectable (aucune parcelle avec GPS).
+// l'absence de site meteo configure.
 function renderRainfallBlock(targetElId, cardElId) {
   const el = document.getElementById(targetElId);
   if (!el) return;
   const card = cardElId ? document.getElementById(cardElId) : null;
-  const sites = detectSites();
+  const sites = getSitesMeteo();
   if (!sites.length) {
     if (card) card.style.display = 'none';
-    else el.innerHTML = '<span style="font-size:12px;color:var(--rouge);">Aucune parcelle avec GPS renseigne — impossible de calculer la pluviometrie.</span>';
+    else el.innerHTML = '<span style="font-size:12px;color:var(--gris);">Aucun site meteo configure — ajoutez une commune dans la fiche exploitation.</span>';
     return;
   }
   if (card) card.style.display = '';
@@ -1785,6 +1730,7 @@ function renderExploitations() {
       '</div>' +
       // Section applicateurs uniquement pour l'exploitation active
       (e.id === S.currentId ? renderApplicateursSection() : '') +
+      (e.id === S.currentId ? renderSitesMeteoSection() : '') +
     '</div>'
   ).join('');
 }
@@ -2437,6 +2383,94 @@ window.delApplicateur = function(id, nom) {
     const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
     await deleteDoc(baseDoc(btype,'applicateurs',id));
     toast('Applicateur supprime');
+  });
+};
+
+// ── SITES METEO (communes suivies pour la pluviometrie) ──
+function renderSitesMeteoSection() {
+  const sites = S.sitesMeteo || [];
+  return '<div style="margin-top:14px;border-top:1px solid var(--gris-l);padding-top:14px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
+      '<div style="font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.5px;">🌧️ Sites meteo (pluviometrie)</div>' +
+      '<button class="btn btn-primary btn-sm" onclick="openSiteMeteoModal(null)">+ Ajouter</button>' +
+    '</div>' +
+    (sites.length === 0 ?
+      '<div style="font-size:12px;color:var(--gris);opacity:.6;">Aucune commune suivie — ajoutez-en une pour voir la pluviometrie sur le tableau de bord.</div>' :
+      '<div style="display:flex;flex-direction:column;gap:6px;">' +
+      sites.map(s => '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--gris-l);border-radius:var(--r-sm);">' +
+          '<div>' +
+            '<div style="font-weight:600;font-size:13px;">' + s.nom + (s.cp ? ' (' + s.cp + ')' : '') + '</div>' +
+            '<div style="font-size:11px;color:var(--gris);">' + s.lat.toFixed(4) + ', ' + s.lon.toFixed(4) + '</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:4px;">' +
+            '<button class="btn btn-icon edt" onclick="openSiteMeteoModal(\'' + s.id + '\')" title="Modifier">✏️</button>' +
+            '<button class="btn btn-icon del" onclick="delSiteMeteo(\'' + s.id + '\',\'' + s.nom + '\')" title="Supprimer">🗑️</button>' +
+          '</div>' +
+        '</div>').join('') +
+      '</div>'
+    ) +
+  '</div>';
+}
+
+window.openSiteMeteoModal = function(sid) {
+  const s = sid ? (S.sitesMeteo || []).find(x => x.id === sid) : null;
+  const body =
+    '<div class="form-grid">' +
+      '<div class="form-group full"><label>Commune *</label><input type="text" id="fsm-nom" value="' + (s?s.nom:'') + '" placeholder="ex: Chablis"></div>' +
+      '<div class="form-group"><label>Code postal</label><input type="text" id="fsm-cp" value="' + (s?s.cp||'':'') + '" placeholder="ex: 89800"></div>' +
+      '<div class="form-group"><button type="button" class="btn btn-secondary btn-sm" style="margin-top:22px;" onclick="geocodeSiteMeteo()">🔍 Rechercher les coordonnees</button></div>' +
+    '</div>' +
+    '<div id="fsm-gps-status" style="margin-top:6px;font-size:12px;color:var(--gris);">' +
+      (s ? 'Coordonnees actuelles : ' + s.lat.toFixed(4) + ', ' + s.lon.toFixed(4) : 'Renseignez la commune puis cliquez sur Rechercher.') +
+    '</div>' +
+    '<input type="hidden" id="fsm-lat" value="' + (s?s.lat:'') + '">' +
+    '<input type="hidden" id="fsm-lon" value="' + (s?s.lon:'') + '">';
+  openModal(s ? 'Modifier le site meteo' : 'Nouveau site meteo', body, () => saveSiteMeteo(sid));
+};
+
+// Geocodage via l'API Adresse du gouvernement francais (gratuite, sans cle)
+window.geocodeSiteMeteo = async function() {
+  const nom = document.getElementById('fsm-nom').value.trim();
+  const cp = document.getElementById('fsm-cp').value.trim();
+  const status = document.getElementById('fsm-gps-status');
+  if (!nom) { toast('Renseignez le nom de la commune', true); return; }
+  status.innerHTML = '<span style="color:var(--gris);">Recherche en cours...</span>';
+  try {
+    const q = encodeURIComponent(nom + (cp ? ' ' + cp : ''));
+    const url = 'https://api-adresse.data.gouv.fr/search/?q=' + q + '&type=municipality&limit=1';
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('reponse HTTP ' + res.status);
+    const data = await res.json();
+    const feat = data.features && data.features[0];
+    if (!feat) { status.innerHTML = '<span style="color:var(--rouge);">Commune introuvable, verifiez l orthographe.</span>'; return; }
+    const [lon, lat] = feat.geometry.coordinates;
+    document.getElementById('fsm-lat').value = lat;
+    document.getElementById('fsm-lon').value = lon;
+    status.innerHTML = '<span style="color:var(--vert);">✓ ' + feat.properties.label + ' — ' + lat.toFixed(4) + ', ' + lon.toFixed(4) + '</span>';
+  } catch(e) {
+    status.innerHTML = '<span style="color:var(--rouge);">Erreur de geocodage : ' + e.message + '</span>';
+  }
+};
+
+async function saveSiteMeteo(sid) {
+  const nom = document.getElementById('fsm-nom').value.trim();
+  const cp = document.getElementById('fsm-cp').value.trim();
+  const lat = parseFloat(document.getElementById('fsm-lat').value);
+  const lon = parseFloat(document.getElementById('fsm-lon').value);
+  if (!nom) { toast('Nom de la commune requis', true); return; }
+  if (Number.isNaN(lat) || Number.isNaN(lon)) { toast('Coordonnees manquantes — cliquez sur Rechercher', true); return; }
+  const data = { nom, cp, lat, lon };
+  try {
+    if (sid) await setDoc(subdoc(S.currentId, 'sitesMeteo', sid), data, {merge:true});
+    else await addDoc(sub(S.currentId, 'sitesMeteo'), data);
+    closeModal(); toast('Site meteo enregistre');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+window.delSiteMeteo = function(id, nom) {
+  confirm2('Supprimer "' + nom + '" ?', 'L historique de pluie deja enregistre pour ce site restera dans la base mais ne sera plus affiche.', async () => {
+    await deleteDoc(subdoc(S.currentId, 'sitesMeteo', id));
+    toast('Site meteo supprime');
   });
 };
 
