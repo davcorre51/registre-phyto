@@ -1400,45 +1400,42 @@ function sumRain(joursMap, startISO, endISO) {
 }
 
 // Recupere les precipitations quotidiennes (mm) entre startISO et endISO (inclus) pour un point GPS.
-// Utilise l'API prevision (past_days) si la periode est recente (<=90j), sinon l'API archive
-// (aucune limite de duree, mais ~5j de decalage sur les donnees les plus recentes, completees
-// par l'API prevision pour cette toute derniere periode).
+// Utilise la Historical Forecast API d'Open-Meteo pour toute la partie passee : elle rejoue les
+// sorties archivees des modeles haute resolution (AROME France ~1,5-2,5km, contre 9-25km pour l'ancienne
+// API archive ERA5), disponible depuis fin 2022 — largement suffisant pour couvrir une campagne depuis
+// le 1er janvier. Les tout derniers jours (pas encore dans l'archive historique) restent recuperes via
+// l'API prevision standard.
 async function fetchDailyPrecip(lat, lon, startISO, endISO) {
   if (!startISO || startISO > endISO) return {};
   const results = {};
   const todayISO = new Date().toISOString().slice(0,10);
-  const daysSinceStart = Math.round((new Date(todayISO) - new Date(startISO)) / 86400000);
-  if (daysSinceStart <= 90) {
-    const days = Math.min(92, daysSinceStart + 2);
-    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
-      '&daily=precipitation_sum&past_days=' + days + '&forecast_days=1&timezone=auto';
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('API prevision : reponse HTTP ' + res.status);
-    const data = await res.json();
-    if (!data.daily || !data.daily.time) throw new Error('API prevision : reponse inattendue');
-    (data.daily.time || []).forEach((d,i) => {
-      if (d >= startISO && d <= endISO) results[d] = data.daily.precipitation_sum[i] || 0;
-    });
-  } else {
-    const archiveEndDate = new Date(); archiveEndDate.setDate(archiveEndDate.getDate() - 5);
-    const archiveEndISO = archiveEndDate.toISOString().slice(0,10);
-    if (archiveEndISO >= startISO) {
-      const url1 = 'https://archive-api.open-meteo.com/v1/archive?latitude=' + lat + '&longitude=' + lon +
-        '&start_date=' + startISO + '&end_date=' + archiveEndISO + '&daily=precipitation_sum&timezone=auto';
-      const res1 = await fetch(url1);
-      if (!res1.ok) throw new Error('API archive : reponse HTTP ' + res1.status);
-      const d1 = await res1.json();
-      if (!d1.daily || !d1.daily.time) throw new Error('API archive : reponse inattendue');
-      (d1.daily.time || []).forEach((d,i) => { results[d] = d1.daily.precipitation_sum[i] || 0; });
-    }
+  const recentCutoff = new Date(); recentCutoff.setDate(recentCutoff.getDate() - 2);
+  const recentCutoffISO = recentCutoff.toISOString().slice(0,10);
+
+  // Partie historique (Historical Forecast API, resolution Meteo-France AROME)
+  const histEndISO = recentCutoffISO < endISO ? recentCutoffISO : endISO;
+  if (startISO <= histEndISO) {
+    const url1 = 'https://historical-forecast-api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
+      '&start_date=' + startISO + '&end_date=' + histEndISO + '&daily=precipitation_sum&timezone=auto';
+    const res1 = await fetch(url1);
+    if (!res1.ok) throw new Error('API historique : reponse HTTP ' + res1.status);
+    const d1 = await res1.json();
+    if (!d1.daily || !d1.daily.time) throw new Error('API historique : reponse inattendue');
+    (d1.daily.time || []).forEach((d,i) => { if (d >= startISO && d <= endISO) results[d] = d1.daily.precipitation_sum[i] || 0; });
+  }
+
+  // Tout derniers jours (pas encore dans l'archive historique) : API prevision standard
+  const recentStartISO = histEndISO >= startISO ? addOneDayISO(histEndISO) : startISO;
+  if (recentStartISO <= endISO) {
+    const days = Math.min(92, Math.max(1, Math.round((new Date(todayISO) - new Date(recentStartISO)) / 86400000) + 2));
     const url2 = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon +
-      '&daily=precipitation_sum&past_days=7&forecast_days=1&timezone=auto';
+      '&daily=precipitation_sum&past_days=' + days + '&forecast_days=1&timezone=auto';
     const res2 = await fetch(url2);
     if (!res2.ok) throw new Error('API prevision : reponse HTTP ' + res2.status);
     const d2 = await res2.json();
     if (!d2.daily || !d2.daily.time) throw new Error('API prevision : reponse inattendue');
     (d2.daily.time || []).forEach((d,i) => {
-      if (d >= startISO && d <= endISO) results[d] = d2.daily.precipitation_sum[i] || 0;
+      if (d >= recentStartISO && d <= endISO) results[d] = d2.daily.precipitation_sum[i] || 0;
     });
   }
   return results;
