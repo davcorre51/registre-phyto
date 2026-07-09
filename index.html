@@ -2072,9 +2072,12 @@ window.openPassageEngraisModal = function(pid, dupData) {
           '</div></div>';
       }).join('');
 
+  const numValEng = p ? p.num : cpPassages().filter(x=>x.type==='engrais').length+1;
   const body =
+    '<div style="display:flex;gap:12px;margin-bottom:12px;">' +
+      '<div class="form-group" style="max-width:130px;"><label>Passage N (auto)</label><input type="number" id="fe-num" value="' + numValEng + '" readonly style="background:var(--vert-xxl);color:var(--vert);font-weight:600;"></div>' +
+    '</div>' +
     '<div class="form-grid" style="margin-bottom:12px;">' +
-      '<div class="form-group"><label>Passage N</label><input type="number" id="fe-num" value="' + (p ? p.num : cpPassages().filter(x=>x.type==='engrais').length+1) + '" min="1"></div>' +
       '<div class="form-group"><label>Campagne</label><input type="text" id="fe-camp" value="' + (p ? yearOf(p) : S.campagne) + '"></div>' +
       '<div class="form-group"><label>Date</label><input type="date" id="fe-date" value="' + (p ? toISO(p.date) : '') + '"></div>' +
     '</div>' +
