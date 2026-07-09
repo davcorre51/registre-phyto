@@ -230,7 +230,7 @@ tr:hover td{background:var(--vert-xxl);}
 
       <div class="stat-card" style="border-color:var(--vert);"><div class="stat-label">IFT Total</div><div class="stat-val" id="stat-ift">0</div><div class="stat-unit">campagne en cours (hors biocontrole)</div></div>
 
-      <div class="stat-card rouge"><div class="stat-label">Parcelles</div><div class="stat-val" id="stat-parcelles">0</div><div class="stat-unit">dans l exploitation</div></div>
+      <div class="stat-card rouge"><div class="stat-label">Pluviometrie</div><div class="stat-val" id="stat-pluvio">-</div><div class="stat-unit">mm depuis le 1er janvier</div></div>
     </div>
 
     <div class="card" id="rainfall-card" style="display:none;">
@@ -1151,7 +1151,6 @@ function render() {
   updateTopbar();
   const cp = cpPassages();
   document.getElementById('stat-passages').textContent = cp.length;
-  document.getElementById('stat-parcelles').textContent = S.parcelles.length;
   const iftTotal = cp.filter(p => p.type !== 'engrais').reduce((sum, p) => { try { var v = (p.ift!==undefined && p.ift!==null ? p.ift : calcIFT(p)); return sum + (Number.isFinite(v) ? v : 0); } catch(e) { return sum; } }, 0);
   document.getElementById('stat-ift').textContent = iftTotal.toFixed(2);
   updateExportResume();
@@ -1176,6 +1175,7 @@ function render() {
 
 function renderDash(cp) {
   renderRainfallCard();
+  renderPluvioStat();
   const el = document.getElementById('dash-passages');
   if (!cp.length) {
     el.innerHTML = '<div class="empty"><div class="empty-icon">🌿</div><div class="empty-text">Aucun passage pour cette campagne</div></div>';
@@ -1531,26 +1531,44 @@ function renderRainfallBlock(targetElId, cardElId) {
       return;
     }
     const todayISO = new Date().toISOString().slice(0,10);
-    const jan1ISO = todayISO.slice(0,4) + '-01-01';
     const rows = sites.map(s => {
       const data = S.pluvioData[s.key] || { jours: {} };
-      const depuisAnnee = sumRain(data.jours, jan1ISO, todayISO);
-      let ligneTraitement = '';
+      let ligneTraitement = '<span style="color:var(--gris);font-size:12px;">Aucun traitement enregistre cette campagne.</span>';
       if (refDate) {
         const refISO = toISO(refDate);
         const depuisTraitement = sumRain(data.jours, refISO, todayISO);
-        ligneTraitement = '<span style="color:var(--vert);font-weight:600;">' + depuisTraitement.toFixed(1) + ' mm</span> depuis le dernier traitement (' + refDate + ') · ';
+        ligneTraitement = '<span style="color:var(--vert);font-weight:600;">' + depuisTraitement.toFixed(1) + ' mm</span> depuis le dernier traitement (' + refDate + ')';
       }
       return '<div style="margin:4px 0;font-size:13px;"><strong>' + s.label + '</strong><br>' +
-        ligneTraitement +
-        '<span style="color:var(--gris);font-size:12px;">' + depuisAnnee.toFixed(1) + ' mm depuis le 1er janvier</span></div>';
+        ligneTraitement + '</div>';
     }).join('');
     el2.innerHTML = rows;
   });
 }
 
-window.renderRainfallZone = function(targetId) { renderRainfallBlock(targetId, null); };
 function renderRainfallCard() { renderRainfallBlock('rainfall-content', 'rainfall-card'); }
+
+// Alimente la stat-card "Pluviometrie" du tableau de bord : cumul depuis le 1er janvier,
+// moyenne des sites meteo configures (un seul site dans la grande majorite des cas).
+function renderPluvioStat() {
+  const statEl = document.getElementById('stat-pluvio');
+  if (!statEl) return;
+  const eidAtCall = S.currentId;
+  const sites = getSitesMeteo();
+  if (!sites.length) { statEl.textContent = '-'; return; }
+  statEl.textContent = '...';
+  ensureRainfallSync().then(result => {
+    if (S.currentId !== eidAtCall) return;
+    const el = document.getElementById('stat-pluvio');
+    if (!el) return;
+    if (result && result.ok === false) { el.textContent = '?'; return; }
+    const todayISO = new Date().toISOString().slice(0,10);
+    const jan1ISO = todayISO.slice(0,4) + '-01-01';
+    const totals = sites.map(s => sumRain((S.pluvioData[s.key]||{jours:{}}).jours, jan1ISO, todayISO));
+    const moyenne = totals.reduce((a,b)=>a+b, 0) / totals.length;
+    el.textContent = moyenne.toFixed(0);
+  });
+}
 
 window.selectAllParcelles = function(checked) {
   document.querySelectorAll('.parc-cb').forEach(cb => cb.checked = checked);
