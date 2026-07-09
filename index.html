@@ -1328,6 +1328,13 @@ function recalcDRE() {
   if (field) field.value = maxDre;
 }
 
+window.togglePctSurface = function() {
+  const link = document.getElementById('pct-toggle-link');
+  const wrap = document.getElementById('pct-surface-wrap');
+  if (link) link.style.display = 'none';
+  if (wrap) wrap.style.display = '';
+};
+
 window.insertGPSNotes = function() {
   const checks = document.querySelectorAll('.parc-cb:checked');
   const gpsLines = [];
@@ -1851,12 +1858,16 @@ window.openPassageModal = function(pid, dupData) {
       '</div></div>';
   }).join('');
 
+  const numVal = p ? p.num : cpPassages().filter(x=>x.type!=='engrais').length+1;
+  const dreVal = p ? p.dre||0 : 0;
   const body =
+    '<div style="display:flex;gap:12px;margin-bottom:12px;">' +
+      '<div class="form-group" style="max-width:130px;"><label>Passage N (auto)</label><input type="number" id="f-num" value="' + numVal + '" readonly style="background:var(--vert-xxl);color:var(--vert);font-weight:600;"></div>' +
+      '<div class="form-group" style="max-width:150px;"><label>DRE max (h) — auto</label><input type="number" id="f-dre" value="' + dreVal + '" readonly style="background:var(--vert-xxl);color:var(--vert);font-weight:600;"></div>' +
+    '</div>' +
     '<div class="form-grid" style="margin-bottom:12px;">' +
-      '<div class="form-group"><label>Passage N</label><input type="number" id="f-num" value="' + (p ? p.num : cpPassages().filter(x=>x.type!=='engrais').length+1) + '" min="1"></div>' +
       '<div class="form-group"><label>Campagne</label><input type="text" id="f-camp" value="' + (p ? yearOf(p) : S.campagne) + '"></div>' +
       '<div class="form-group"><label>Date</label><input type="date" id="f-date" value="' + (p ? toISO(p.date) : '') + '"></div>' +
-      '<div class="form-group"><label>DRE max (h) — auto</label><input type="number" id="f-dre" value="' + (p ? p.dre||0 : 0) + '" readonly style="background:var(--vert-xxl);color:var(--vert);font-weight:600;"></div>' +
       '<div class="form-group"><label>Heure debut (HH:MM)</label><input type="time" id="f-hdeb" value="' + (p ? p.heureDebut||'' : '') + '"></div>' +
       '<div class="form-group"><label>Heure fin (HH:MM)</label><input type="time" id="f-hfin" value="' + (p ? p.heureFin||'' : '') + '"></div>' +
     '</div>' +
@@ -1892,13 +1903,17 @@ window.openPassageModal = function(pid, dupData) {
         pa.nom + '</label>'
       ).join('') +
       '</div>' +
-      '<div class="form-group" style="margin-top:10px;max-width:260px;">' +
-        '<label>% de la surface traitee (desherbage localise, 100% si traitement total)</label>' +
-        '<input type="number" id="f-pct-surface" min="1" max="100" value="' + (p && p.pourcentSurface ? p.pourcentSurface : 100) + '">' +
-      '</div>' +
-      '<div style="margin-top:10px;" id="pluvio-form-wrap">' +
-        '<div id="pluvio-zone">🌧️ Pluviometrie : calcul en cours...</div>' +
-      '</div>' +
+      (function(){
+        const pctVal = p && p.pourcentSurface ? p.pourcentSurface : 100;
+        const partiel = pctVal !== 100;
+        return '<div id="pct-toggle-link" style="margin-top:10px;' + (partiel?'display:none;':'') + '">' +
+            '<button type="button" class="btn btn-secondary btn-sm" onclick="togglePctSurface()">Traitement partiel de la parcelle ?</button>' +
+          '</div>' +
+          '<div class="form-group" id="pct-surface-wrap" style="margin-top:10px;max-width:260px;' + (partiel?'':'display:none;') + '">' +
+            '<label>% de la surface traitee (desherbage localise)</label>' +
+            '<input type="number" id="f-pct-surface" min="1" max="100" value="' + pctVal + '">' +
+          '</div>';
+      })() +
     '</div>' +
     '<div class="section-title">Produits appliques</div>' +
     prodsHTML +
@@ -1917,7 +1932,6 @@ window.openPassageModal = function(pid, dupData) {
     '<div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="insertGPSNotes()">📍 Inserer GPS parcelles</button></div>';
 
   openModal(pid ? 'Modifier le passage' : (dupData ? 'Nouveau passage (duplique)' : 'Nouveau passage'), body, () => savePassage(pid));
-  renderRainfallZone('pluvio-zone');
 };
 
 function prodLineHTML(cat, existing, catProds) {
