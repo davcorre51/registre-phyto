@@ -1594,7 +1594,10 @@ function renderProduits() {
   const filtre = (S.produitsFiltre||'').toUpperCase().trim();
   const matchFiltre = p => !filtre || p.nom.toUpperCase().includes(filtre);
   const rowHtml = p => '<tr style="' + (p.actif===false ? 'opacity:0.55;' : '') + '"><td style="font-weight:600;">' + (p.favori ? '⭐ ' : '') + p.nom + (p.actif===false ? ' <span style="font-size:10px;color:var(--gris);font-weight:400;">(archive)</span>' : '') + '</td><td>' + (p.qte ? p.qte + ' ' + (p.unite||'') : (p.dose||'-')) + '</td><td>' + (p.dre||0) + '</td><td>' + (p.dar||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td><td>' + (p.doseReference!==null && p.doseReference!==undefined ? p.doseReference : '<span style="color:var(--gris);font-size:11px;">hors IFT</span>') + '</td>' +
-    '<td><div class="td-actions"><button class="btn btn-icon" onclick="toggleFavoriProduit(\'' + p.id + '\',' + (p.favori ? 'true' : 'false') + ')" title="' + (p.favori ? 'Retirer des favoris' : 'Marquer comme favori') + '">' + (p.favori ? '⭐' : '☆') + '</button>' +
+    '<td><div class="td-actions">' +
+    '<a class="btn btn-icon" href="https://ephy.anses.fr/resultats_recherche/ppp?search_api_aggregation_3=' + encodeURIComponent(p.nom) + '" target="_blank" rel="noopener" title="Chercher ' + p.nom + ' sur E-Phy (ANSES)">🔎</a>' +
+    '<a class="btn btn-icon" href="https://ecoagri.agriculture.gouv.fr/ift/doses-reference/2026" target="_blank" rel="noopener" title="Doses de reference IFT 2026 (Ecoagri)">📊</a>' +
+    '<button class="btn btn-icon" onclick="toggleFavoriProduit(\'' + p.id + '\',' + (p.favori ? 'true' : 'false') + ')" title="' + (p.favori ? 'Retirer des favoris' : 'Marquer comme favori') + '">' + (p.favori ? '⭐' : '☆') + '</button>' +
     '<button class="btn btn-icon edt" onclick="openProduitModal(\'' + p.id + '\',null)" title="Modifier">✏️</button>' +
     '<button class="btn btn-icon" onclick="toggleArchiveProduit(\'' + p.id + '\',' + (p.actif===false ? 'true' : 'false') + ')" title="' + (p.actif===false ? 'Reactiver' : 'Archiver') + '">' + (p.actif===false ? '♻️' : '📦') + '</button>' +
     '<button class="btn btn-icon del" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>';
