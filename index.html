@@ -1704,17 +1704,44 @@ window.openStockRapide = async function() {
   const toutes = [...lignesPhyto, ...lignesEngrais].sort((a, b) => a.nom.localeCompare(b.nom));
   const el = document.getElementById('stock-rapide-content');
   if (!el) return;
+  const boutonGeneral = '<button class="btn btn-secondary btn-sm" style="margin-bottom:10px;" onclick="ouvrirChoixAchat()">+ Ajouter un achat</button>';
   if (!toutes.length) {
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">Aucun stock disponible</div></div>';
+    el.innerHTML = boutonGeneral + '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">Aucun stock disponible</div></div>';
     return;
   }
-  el.innerHTML = '<div class="table-wrap"><table><tbody>' +
+  el.innerHTML = boutonGeneral + '<div class="table-wrap"><table><tbody>' +
     toutes.map(l =>
       '<tr><td style="font-weight:600;">' + l.nom + (l.kind === 'engrais' ? ' <span style="font-size:10px;color:var(--gris);font-weight:400;">(engrais)</span>' : '') + '</td>' +
       '<td style="text-align:right;white-space:nowrap;">' + l.stock.toFixed(1) + ' ' + l.unite + '</td>' +
       '<td style="text-align:right;"><button class="btn btn-icon" onclick="ajouterAchat(\'' + l.kind + '\',\'' + l.id + '\',\'' + l.nom.replace(/'/g,"\\'") + '\',\'' + l.unite + '\')" title="Ajouter un achat">+</button></td></tr>'
     ).join('') +
     '</tbody></table></div>';
+};
+
+window.ouvrirChoixAchat = function() {
+  const optsPhyto = S.produits.filter(p => p.actif !== false).map(p =>
+    '<option value="phyto||' + p.id + '||' + p.nom.replace(/"/g,'') + '||' + uniteStock(p.unite) + '">' + p.nom + '</option>'
+  ).join('');
+  const optsEngrais = S.engrais.map(eg =>
+    '<option value="engrais||' + eg.id + '||' + eg.nom.replace(/"/g,'') + '||' + uniteStock(eg.unite) + '">' + eg.nom + ' (engrais)</option>'
+  ).join('');
+  const body =
+    '<div class="form-group"><label>Produit</label><select id="achat-produit-choix"><option value="">-- Choisir --</option>' + optsPhyto + optsEngrais + '</select></div>' +
+    '<div class="form-group" style="margin-top:10px;"><label>Quantite achetee</label><input type="number" step="0.01" min="0" id="achat-qte-general"></div>';
+  openModal('Ajouter un achat', body, async () => {
+    const val = document.getElementById('achat-produit-choix').value;
+    if (!val) { toast('Choisissez un produit', true); return; }
+    const [kind, id] = val.split('||');
+    const qte = parseFloat(document.getElementById('achat-qte-general').value) || 0;
+    if (qte <= 0) { toast('Quantite invalide', true); return; }
+    const ex = getEx();
+    const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+    try {
+      await setDoc(baseDoc(btype, kind === 'engrais' ? 'engrais' : 'produits', id), { achatsTotal: increment(qte) }, { merge: true });
+      toast('Achat enregistre');
+      openStockRapide();
+    } catch (e) { toast('Erreur : ' + e.message, true); }
+  });
 };
 
 window.ajouterAchat = function(kind, id, nom, unite) {
