@@ -209,7 +209,6 @@ tr:hover td{background:var(--vert-xxl);}
   <div class="tab active" onclick="showPage('dashboard')">Tableau de bord</div>
   <div class="tab" onclick="showPage('passages')">Passages</div>
   <div class="tab" onclick="showPage('produits')">Produits</div>
-  <div class="tab" onclick="showPage('parcelles')">Parcelles</div>
   <div class="tab" onclick="showPage('exploitations')">Exploitations</div>
   <div class="tab" onclick="showPage('export')">Export</div>
 </div>
@@ -285,8 +284,11 @@ tr:hover td{background:var(--vert-xxl);}
   <!-- PARCELLES -->
   <div id="page-parcelles" class="page">
     <div class="page-header">
-      <h2>Parcelles</h2>
-      <button class="btn btn-primary btn-sm" onclick="openParcelleModal(null)">+ Ajouter</button>
+      <h2>Parcelles <span style="font-size:12px;color:var(--gris);font-weight:400;">— exploitation active</span></h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="showPage('exploitations')">← Retour aux exploitations</button>
+        <button class="btn btn-primary btn-sm" onclick="openParcelleModal(null)">+ Ajouter</button>
+      </div>
     </div>
     <div class="parcelle-list" id="parcelles-list"></div>
   </div>
@@ -371,6 +373,7 @@ tr:hover td{background:var(--vert-xxl);}
 <div id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, getDocs, getDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -1139,7 +1142,7 @@ window.showPage = function(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-  const map = {dashboard:0, passages:1, produits:2, parcelles:3, exploitations:4, export:5};
+  const map = {dashboard:0, passages:1, produits:2, exploitations:3, export:4, parcelles:3};
   if (map[name] !== undefined) document.querySelectorAll('.tab')[map[name]].classList.add('active');
 };
 
@@ -1281,12 +1284,51 @@ function renderPassages(cp) {
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
           '<button class="btn btn-icon edt" onclick="' + (isEng ? 'openPassageEngraisModal' : 'openPassageModal') + '(\'' + p.id + '\')" title="Modifier">✏️</button>' +
           '<button class="btn btn-icon" onclick="duplicatePassage(\'' + p.id + '\')" title="Dupliquer">📄</button>' +
+          (S.exploitations.length > 1 ? '<button class="btn btn-icon" onclick="ouvrirChoixDuplicationExploit(\'' + p.id + '\')" title="Dupliquer vers une autre exploitation">📤</button>' : '') +
           '<button class="btn btn-icon del" onclick="delPassage(\'' + p.id + '\')" title="Supprimer">🗑️</button>' +
         '</div>' +
       '</div>' +
     '</div>';
   }).join('');
 }
+
+// Duplique un passage vers une AUTRE exploitation : les produits/doses/dates sont repris,
+// mais les parcelles sont effacees (elles ne correspondent pas forcement d'une exploitation a l'autre)
+// et devront etre re-selectionnees par l'utilisateur dans le nouveau formulaire.
+window.ouvrirChoixDuplicationExploit = function(id) {
+  const autres = S.exploitations.filter(e => e.id !== S.currentId);
+  if (!autres.length) { toast('Aucune autre exploitation disponible', true); return; }
+  const body = '<div class="form-group"><label>Dupliquer vers</label><select id="dup-exploit-choix">' +
+    autres.map(e => '<option value="' + e.id + '">' + e.nom + '</option>').join('') +
+    '</select></div>' +
+    '<div style="font-size:12px;color:var(--gris);margin-top:8px;">Les produits, doses et la date seront repris. Les parcelles ne sont pas reprises : a re-selectionner dans la nouvelle exploitation.</div>';
+  openModal('Dupliquer vers une autre exploitation', body, () => {
+    const targetId = document.getElementById('dup-exploit-choix').value;
+    duplicatePassageVersExploit(id, targetId);
+  });
+};
+
+window.duplicatePassageVersExploit = function(id, targetId) {
+  const src = S.passages.find(x => x.id === id);
+  if (!src) { toast('Passage introuvable', true); return; }
+  const clone = JSON.parse(JSON.stringify(src));
+  delete clone.id;
+  clone.parcelles = [];
+  clone.parcellesIds = [];
+  const isEngrais = src.type === 'engrais';
+  switchExploit(targetId);
+  toast('Basculement vers la nouvelle exploitation...');
+  setTimeout(() => {
+    if (isEngrais) {
+      clone.num = cpPassages().filter(x => x.type === 'engrais').length + 1;
+      openPassageEngraisModal(null, clone);
+    } else {
+      clone.num = cpPassages().filter(x => x.type !== 'engrais').length + 1;
+      openPassageModal(null, clone);
+    }
+    toast('Passage duplique — selectionnez les parcelles et verifiez la date');
+  }, 600);
+};
 
 // Extraire quantite et unite depuis une chaine "1.5 L/HA"
 function extractQte(dose) {
@@ -1601,6 +1643,7 @@ function renderProduits() {
   const filtre = (S.produitsFiltre||'').toUpperCase().trim();
   const matchFiltre = p => !filtre || p.nom.toUpperCase().includes(filtre);
   const rowHtml = p => '<tr style="' + (p.actif===false ? 'opacity:0.55;' : '') + '"><td style="font-weight:600;">' + (p.favori ? '⭐ ' : '') + p.nom + (p.actif===false ? ' <span style="font-size:10px;color:var(--gris);font-weight:400;">(archive)</span>' : '') + '</td><td>' + (p.qte ? p.qte + ' ' + (p.unite||'') : (p.dose||'-')) + '</td><td>' + (p.dre||0) + '</td><td>' + (p.dar||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td><td>' + (p.doseReference!==null && p.doseReference!==undefined ? p.doseReference : '<span style="color:var(--gris);font-size:11px;">hors IFT</span>') + '</td>' +
+    '<td id="stock-col-p-' + p.id + '" style="font-size:12px;color:var(--gris);">...</td>' +
     '<td><div class="td-actions">' +
     '<button class="btn btn-icon" onclick="toggleFavoriProduit(\'' + p.id + '\',' + (p.favori ? 'true' : 'false') + ')" title="' + (p.favori ? 'Retirer des favoris' : 'Marquer comme favori') + '">' + (p.favori ? '⭐' : '☆') + '</button>' +
     '<button class="btn btn-icon edt" onclick="openProduitModal(\'' + p.id + '\',null)" title="Modifier">✏️</button>' +
@@ -1624,13 +1667,14 @@ function renderProduits() {
         '</div>' +
       '</div>' +
       '<div id="' + catKey + '">' +
-        '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose recommandee</th><th>DRE (h)</th><th>DAR (j)</th><th>N AMM</th><th>Dose ref. IFT</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
-        (prodsAll.length ? [...prods, ...archives].map(rowHtml).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--gris);font-size:12px;padding:12px;">Aucun produit</td></tr>') +
+        '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose recommandee</th><th>DRE (h)</th><th>DAR (j)</th><th>N AMM</th><th>Dose ref. IFT</th><th>Stock</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
+        (prodsAll.length ? [...prods, ...archives].map(rowHtml).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--gris);font-size:12px;padding:12px;">Aucun produit</td></tr>') +
         '</tbody></table></div>' +
         '<button class="btn btn-secondary btn-sm" style="margin-top:6px;" onclick="openProduitModal(null,\'' + cat + '\')">+ Produit ' + cat + '</button>' +
       '</div>' +
     '</div>';
   }).join('');
+  refreshStockColumns();
 }
 
 // ── STOCK (produits phyto + engrais) ────────────────────────
@@ -1686,6 +1730,31 @@ async function fetchConsommationParType(btype) {
   return { consoPhyto, consoEngrais };
 }
 
+let stockRefreshToken = 0;
+async function refreshStockColumns() {
+  const token = ++stockRefreshToken;
+  const ex = getEx();
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  const { consoPhyto, consoEngrais } = await fetchConsommationParType(btype);
+  if (token !== stockRefreshToken) return; // une demande plus recente a pris le relais
+  S.produits.forEach(p => {
+    const el = document.getElementById('stock-col-p-' + p.id);
+    if (!el) return;
+    const key = p.nom + '||' + p.cat;
+    const stock = (p.achatsTotal || 0) - (consoPhyto[key] || 0);
+    el.textContent = stock.toFixed(1) + ' ' + uniteStock(p.unite);
+    el.style.color = stock <= 0 ? 'var(--rouge)' : 'var(--gris)';
+  });
+  S.engrais.forEach(eg => {
+    const el = document.getElementById('stock-col-e-' + eg.id);
+    if (!el) return;
+    const key = eg.nom + '||' + (eg.categorie || '');
+    const stock = (eg.achatsTotal || 0) - (consoEngrais[key] || 0);
+    el.textContent = stock.toFixed(1) + ' ' + uniteStock(eg.unite);
+    el.style.color = stock <= 0 ? 'var(--rouge)' : 'var(--gris)';
+  });
+}
+
 window.openStockRapide = async function() {
   const ex = getEx();
   const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
@@ -1694,39 +1763,51 @@ window.openStockRapide = async function() {
   const lignesPhyto = S.produits.filter(p => p.actif !== false).map(p => {
     const key = p.nom + '||' + p.cat;
     const stock = (p.achatsTotal || 0) - (consoPhyto[key] || 0);
-    return { id: p.id, kind: 'phyto', nom: p.nom, unite: uniteStock(p.unite), stock };
+    return { id: p.id, kind: 'phyto', nom: p.nom, cat: p.cat || 'Autre', unite: uniteStock(p.unite), stock };
   }).filter(l => l.stock > 0);
   const lignesEngrais = S.engrais.map(eg => {
     const key = eg.nom + '||' + (eg.categorie || '');
     const stock = (eg.achatsTotal || 0) - (consoEngrais[key] || 0);
-    return { id: eg.id, kind: 'engrais', nom: eg.nom, unite: uniteStock(eg.unite), stock };
+    return { id: eg.id, kind: 'engrais', nom: eg.nom, cat: (eg.categorie || 'Autre') + ' (engrais)', unite: uniteStock(eg.unite), stock };
   }).filter(l => l.stock > 0);
-  const toutes = [...lignesPhyto, ...lignesEngrais].sort((a, b) => a.nom.localeCompare(b.nom));
+  const toutes = [...lignesPhyto, ...lignesEngrais];
+  S.dernierStockCalcule = toutes; // reutilise pour l'export PDF sans recalculer
   const el = document.getElementById('stock-rapide-content');
   if (!el) return;
-  const boutonGeneral = '<button class="btn btn-secondary btn-sm" style="margin-bottom:10px;" onclick="ouvrirChoixAchat()">+ Ajouter un achat</button>';
+  const boutons = '<div style="display:flex;gap:8px;margin-bottom:10px;">' +
+    '<button class="btn btn-secondary btn-sm" onclick="ouvrirChoixAchat()">+ Ajouter un achat</button>' +
+    (toutes.length ? '<button class="btn btn-secondary btn-sm" onclick="exportStockPdf()">🖨️ Export PDF</button>' : '') +
+    '</div>';
   if (!toutes.length) {
-    el.innerHTML = boutonGeneral + '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">Aucun stock disponible</div></div>';
+    el.innerHTML = boutons + '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">Aucun stock disponible</div></div>';
     return;
   }
-  el.innerHTML = boutonGeneral + '<div class="table-wrap"><table><tbody>' +
-    toutes.map(l =>
-      '<tr><td style="font-weight:600;">' + l.nom + (l.kind === 'engrais' ? ' <span style="font-size:10px;color:var(--gris);font-weight:400;">(engrais)</span>' : '') + '</td>' +
-      '<td style="text-align:right;white-space:nowrap;">' + l.stock.toFixed(1) + ' ' + l.unite + '</td>' +
-      '<td style="text-align:right;"><button class="btn btn-icon" onclick="ajouterAchat(\'' + l.kind + '\',\'' + l.id + '\',\'' + l.nom.replace(/'/g,"\\'") + '\',\'' + l.unite + '\')" title="Ajouter un achat">+</button></td></tr>'
-    ).join('') +
-    '</tbody></table></div>';
+  const cats = [...new Set(toutes.map(l => l.cat))];
+  el.innerHTML = boutons + cats.map(cat => {
+    const lignes = toutes.filter(l => l.cat === cat).sort((a,b) => a.nom.localeCompare(b.nom));
+    return '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--vert);margin:10px 0 4px;">' + cat + '</div>' +
+      '<div class="table-wrap"><table><tbody>' +
+      lignes.map(l =>
+        '<tr><td style="font-weight:600;">' + l.nom + '</td>' +
+        '<td style="text-align:right;white-space:nowrap;">' + l.stock.toFixed(1) + ' ' + l.unite + '</td>' +
+        '<td style="text-align:right;white-space:nowrap;">' +
+        '<button class="btn btn-icon" onclick="ajouterAchat(\'' + l.kind + '\',\'' + l.id + '\',\'' + l.nom.replace(/'/g,"\\'") + '\',\'' + l.unite + '\')" title="Ajouter un achat">+</button> ' +
+        '<button class="btn btn-icon edt" onclick="modifierStock(\'' + l.kind + '\',\'' + l.id + '\',\'' + l.nom.replace(/'/g,"\\'") + '\',\'' + l.unite + '\',' + l.stock + ')" title="Modifier le stock">✏️</button> ' +
+        '<button class="btn btn-icon del" onclick="remettreAZeroStock(\'' + l.kind + '\',\'' + l.id + '\',\'' + l.nom.replace(/'/g,"\\'") + '\',' + l.stock + ')" title="Remettre a zero">🗑️</button>' +
+        '</td></tr>'
+      ).join('') +
+      '</tbody></table></div>';
+  }).join('');
 };
 
 window.ouvrirChoixAchat = function() {
-  const optsPhyto = S.produits.filter(p => p.actif !== false).map(p =>
-    '<option value="phyto||' + p.id + '||' + p.nom.replace(/"/g,'') + '||' + uniteStock(p.unite) + '">' + p.nom + '</option>'
-  ).join('');
-  const optsEngrais = S.engrais.map(eg =>
-    '<option value="engrais||' + eg.id + '||' + eg.nom.replace(/"/g,'') + '||' + uniteStock(eg.unite) + '">' + eg.nom + ' (engrais)</option>'
-  ).join('');
+  const catsPhyto = [...new Set(S.produits.filter(p => p.actif !== false).map(p => p.cat || 'Autre'))];
+  const catsEngrais = [...new Set(S.engrais.map(eg => eg.categorie || 'Autre'))];
+  const optsCat = catsPhyto.map(c => '<option value="phyto||' + c + '">' + c + '</option>').join('') +
+    catsEngrais.map(c => '<option value="engrais||' + c + '">' + c + ' (engrais)</option>').join('');
   const body =
-    '<div class="form-group"><label>Produit</label><select id="achat-produit-choix"><option value="">-- Choisir --</option>' + optsPhyto + optsEngrais + '</select></div>' +
+    '<div class="form-group"><label>Categorie</label><select id="achat-cat-choix" onchange="majListeProduitsAchat()"><option value="">-- Choisir --</option>' + optsCat + '</select></div>' +
+    '<div class="form-group" style="margin-top:10px;"><label>Produit</label><select id="achat-produit-choix"><option value="">-- Choisir une categorie d\'abord --</option></select></div>' +
     '<div class="form-group" style="margin-top:10px;"><label>Quantite achetee</label><input type="number" step="0.01" min="0" id="achat-qte-general"></div>';
   openModal('Ajouter un achat', body, async () => {
     const val = document.getElementById('achat-produit-choix').value;
@@ -1744,6 +1825,18 @@ window.ouvrirChoixAchat = function() {
   });
 };
 
+window.majListeProduitsAchat = function() {
+  const val = document.getElementById('achat-cat-choix').value;
+  const sel = document.getElementById('achat-produit-choix');
+  if (!val) { sel.innerHTML = '<option value="">-- Choisir une categorie d\'abord --</option>'; return; }
+  const [kind, cat] = val.split('||');
+  const items = kind === 'engrais'
+    ? S.engrais.filter(eg => (eg.categorie || 'Autre') === cat)
+    : S.produits.filter(p => p.actif !== false && (p.cat || 'Autre') === cat);
+  sel.innerHTML = '<option value="">-- Choisir --</option>' +
+    items.map(it => '<option value="' + kind + '||' + it.id + '">' + it.nom + '</option>').join('');
+};
+
 window.ajouterAchat = function(kind, id, nom, unite) {
   const body =
     '<div class="form-group"><label>Quantite achetee (' + (unite || 'unite') + ') pour ' + nom + '</label>' +
@@ -1759,6 +1852,71 @@ window.ajouterAchat = function(kind, id, nom, unite) {
       openStockRapide();
     } catch (e) { toast('Erreur : ' + e.message, true); }
   });
+};
+
+// Corrige le stock affiche a une valeur exacte saisie manuellement (ex: apres inventaire physique).
+window.modifierStock = function(kind, id, nom, unite, stockActuel) {
+  const body =
+    '<div class="form-group"><label>Nouveau stock reel (' + (unite || 'unite') + ') pour ' + nom + '</label>' +
+    '<input type="number" step="0.01" min="0" id="stock-nouvelle-valeur" value="' + stockActuel.toFixed(1) + '" autofocus></div>';
+  openModal('Modifier le stock', body, async () => {
+    const nouvelleValeur = parseFloat(document.getElementById('stock-nouvelle-valeur').value);
+    if (isNaN(nouvelleValeur) || nouvelleValeur < 0) { toast('Valeur invalide', true); return; }
+    const delta = nouvelleValeur - stockActuel;
+    const ex = getEx();
+    const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+    try {
+      await setDoc(baseDoc(btype, kind === 'engrais' ? 'engrais' : 'produits', id), { achatsTotal: increment(delta) }, { merge: true });
+      toast('Stock corrige');
+      openStockRapide();
+    } catch (e) { toast('Erreur : ' + e.message, true); }
+  });
+};
+
+// Remet le stock a zero (ex: produit fini, casse). Reversible via un nouvel achat ensuite.
+window.remettreAZeroStock = function(kind, id, nom, stockActuel) {
+  confirm2('Remettre a zero le stock de "' + nom + '" ?', 'Le stock affiche redeviendra 0. Cette action ne supprime pas le produit lui-meme.', async () => {
+    const delta = -stockActuel;
+    const ex = getEx();
+    const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+    try {
+      await setDoc(baseDoc(btype, kind === 'engrais' ? 'engrais' : 'produits', id), { achatsTotal: increment(delta) }, { merge: true });
+      toast('Stock remis a zero');
+      openStockRapide();
+    } catch (e) { toast('Erreur : ' + e.message, true); }
+  });
+};
+
+// Export PDF simple du stock actuellement affiche dans "Stock rapide" (via jsPDF, deja charge par l'app).
+window.exportStockPdf = function() {
+  const toutes = S.dernierStockCalcule || [];
+  if (!toutes.length) { toast('Rien a exporter', true); return; }
+  const { jsPDF } = window.jspdf;
+  const docPdf = new jsPDF();
+  const ex = getEx();
+  docPdf.setFontSize(14);
+  docPdf.text('Stock produits - ' + (ex ? ex.nom : ''), 14, 16);
+  docPdf.setFontSize(9);
+  docPdf.text('Genere le ' + new Date().toLocaleDateString('fr-FR'), 14, 22);
+  let y = 32;
+  const cats = [...new Set(toutes.map(l => l.cat))];
+  cats.forEach(cat => {
+    if (y > 275) { docPdf.addPage(); y = 16; }
+    docPdf.setFontSize(11);
+    docPdf.setFont(undefined, 'bold');
+    docPdf.text(cat, 14, y);
+    y += 6;
+    docPdf.setFont(undefined, 'normal');
+    docPdf.setFontSize(10);
+    toutes.filter(l => l.cat === cat).sort((a,b) => a.nom.localeCompare(b.nom)).forEach(l => {
+      if (y > 280) { docPdf.addPage(); y = 16; }
+      docPdf.text(l.nom, 18, y);
+      docPdf.text(l.stock.toFixed(1) + ' ' + l.unite, 180, y, { align: 'right' });
+      y += 6;
+    });
+    y += 4;
+  });
+  docPdf.save('stock_' + (ex ? ex.nom.replace(/[^a-z0-9]/gi,'_') : 'export') + '.pdf');
 };
 
 window.toggleArchiveProduit = async function(id, reactivate) {
@@ -1815,14 +1973,16 @@ function renderEngrais() {
     const prods = S.engrais.filter(e => (e.categorie||'Autre') === cat);
     return '<div class="produits-cat-section">' +
       '<div class="produits-cat-header"><span class="produits-cat-name">' + cat + '</span><span style="font-size:11px;color:var(--gris);">' + prods.length + ' produit(s)</span></div>' +
-      '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose habituelle</th><th>Composition</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
+      '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose habituelle</th><th>Composition</th><th>Stock</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
       prods.map(e => {
         const compo = ['n','p','k','mgo','so3','fe'].map(k => (e.composition && e.composition[k]) ? k.toUpperCase()+':'+e.composition[k] : null).filter(Boolean).join(' / ') || '-';
         return '<tr><td style="font-weight:600;">' + e.nom + '</td><td>' + (e.qte ? e.qte+' '+(e.unite||'') : (e.dose||'-')) + '</td><td style="font-size:12px;">' + compo + '</td>' +
+          '<td id="stock-col-e-' + e.id + '" style="font-size:12px;color:var(--gris);">...</td>' +
           '<td><div class="td-actions"><button class="btn btn-icon edt" onclick="openEngraisModal(\'' + e.id + '\')" title="Modifier">✏️</button><button class="btn btn-icon del" onclick="delEngrais(\'' + e.id + '\',\'' + e.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>';
       }).join('') +
       '</tbody></table></div></div>';
   }).join('');
+  refreshStockColumns();
 }
 
 window.openEngraisModal = function(eid) {
@@ -1957,6 +2117,7 @@ function renderExploitations() {
       '</div>' +
       '<div class="exploit-actions">' +
         (e.id !== S.currentId ? '<button class="btn btn-primary btn-sm" onclick="switchExploit(\'' + e.id + '\')">Activer</button>' : '') +
+        (e.id === S.currentId ? '<button class="btn btn-secondary btn-sm" onclick="showPage(\'parcelles\')">🗺️ Gerer les parcelles</button>' : '') +
         '<button class="btn btn-icon edt" onclick="openExploitModal(\'' + e.id + '\')" title="Modifier">✏️</button>' +
         '<button class="btn btn-icon del" onclick="delExploit(\'' + e.id + '\',\'' + e.nom + '\')" title="Supprimer">🗑️</button>' +
       '</div>' +
