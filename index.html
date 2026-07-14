@@ -281,6 +281,21 @@ tr:hover td{background:var(--vert-xxl);}
     <div id="engrais-sections" style="display:none;"></div>
   </div>
 
+  <!-- STOCK -->
+  <div id="page-stock" class="page">
+    <div class="page-header">
+      <h2>📦 Stock</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="ouvrirChoixAchat()">+ Ajouter un achat</button>
+        <button class="btn btn-secondary btn-sm" id="stock-export-btn" style="display:none;" onclick="exportStockPdf()">🖨️ Export PDF</button>
+      </div>
+    </div>
+    <div class="form-group" style="max-width:320px;margin-bottom:12px;">
+      <input type="text" id="stock-search" placeholder="🔎 Rechercher un produit..." oninput="filtreStock(this.value)">
+    </div>
+    <div id="stock-page-content" style="font-size:13px;color:var(--gris);">Calcul en cours...</div>
+  </div>
+
   <!-- PARCELLES -->
   <div id="page-parcelles" class="page">
     <div class="page-header">
@@ -538,6 +553,14 @@ function yearOf(p) {
   return iso ? iso.slice(0,4) : String(new Date().getFullYear());
 }
 function cpPassages() { return S.passages.filter(p => yearOf(p) === S.campagne); }
+
+// Calcule le prochain numero de passage a partir du numero MAX existant (pas du nombre de passages),
+// pour eviter un doublon si un passage a ete supprime au milieu de la sequence.
+function nextPassageNum(kind) {
+  const liste = cpPassages().filter(x => (kind === 'engrais') ? x.type === 'engrais' : x.type !== 'engrais');
+  const maxNum = liste.reduce((max, x) => Math.max(max, x.num || 0), 0);
+  return maxNum + 1;
+}
 function getEx() { return S.exploitations.find(e => e.id === S.currentId); }
 
 // IFT (Indice de Frequence de Traitement) d'un passage = somme, pour chaque produit hors biocontrole,
@@ -1142,7 +1165,7 @@ window.showPage = function(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('page-' + name).classList.add('active');
-  const map = {dashboard:0, passages:1, produits:2, exploitations:3, export:4, parcelles:3};
+  const map = {dashboard:0, passages:1, produits:2, exploitations:3, export:4, parcelles:3, stock:2};
   if (map[name] !== undefined) document.querySelectorAll('.tab')[map[name]].classList.add('active');
 };
 
@@ -1320,10 +1343,10 @@ window.duplicatePassageVersExploit = function(id, targetId) {
   toast('Basculement vers la nouvelle exploitation...');
   setTimeout(() => {
     if (isEngrais) {
-      clone.num = cpPassages().filter(x => x.type === 'engrais').length + 1;
+      clone.num = nextPassageNum('engrais');
       openPassageEngraisModal(null, clone);
     } else {
-      clone.num = cpPassages().filter(x => x.type !== 'engrais').length + 1;
+      clone.num = nextPassageNum('phyto');
       openPassageModal(null, clone);
     }
     toast('Passage duplique — selectionnez les parcelles et verifiez la date');
@@ -1647,7 +1670,6 @@ function renderProduits() {
     '<td><div class="td-actions">' +
     '<button class="btn btn-icon" onclick="toggleFavoriProduit(\'' + p.id + '\',' + (p.favori ? 'true' : 'false') + ')" title="' + (p.favori ? 'Retirer des favoris' : 'Marquer comme favori') + '">' + (p.favori ? '⭐' : '☆') + '</button>' +
     '<button class="btn btn-icon edt" onclick="openProduitModal(\'' + p.id + '\',null)" title="Modifier">✏️</button>' +
-    '<button class="btn btn-icon" onclick="toggleArchiveProduit(\'' + p.id + '\',' + (p.actif===false ? 'true' : 'false') + ')" title="' + (p.actif===false ? 'Reactiver' : 'Archiver') + '">' + (p.actif===false ? '♻️' : '📦') + '</button>' +
     '<button class="btn btn-icon del" onclick="delProduit(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>';
   el.innerHTML =
     catNames.map(cat => {
@@ -1756,9 +1778,11 @@ async function refreshStockColumns() {
 }
 
 window.openStockRapide = async function() {
+  showPage('stock');
   const ex = getEx();
   const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
-  openModal('📦 Stock rapide', '<div id="stock-rapide-content" style="font-size:13px;color:var(--gris);">Calcul en cours...</div>', null);
+  const el = document.getElementById('stock-page-content');
+  if (el) el.innerHTML = 'Calcul en cours...';
   const { consoPhyto, consoEngrais } = await fetchConsommationParType(btype);
   const lignesPhyto = S.produits.filter(p => p.actif !== false).map(p => {
     const key = p.nom + '||' + p.cat;
@@ -1770,20 +1794,28 @@ window.openStockRapide = async function() {
     const stock = (eg.achatsTotal || 0) - (consoEngrais[key] || 0);
     return { id: eg.id, kind: 'engrais', nom: eg.nom, cat: (eg.categorie || 'Autre') + ' (engrais)', unite: uniteStock(eg.unite), stock };
   }).filter(l => l.stock > 0);
-  const toutes = [...lignesPhyto, ...lignesEngrais];
-  S.dernierStockCalcule = toutes; // reutilise pour l'export PDF sans recalculer
-  const el = document.getElementById('stock-rapide-content');
+  S.dernierStockCalcule = [...lignesPhyto, ...lignesEngrais]; // reutilise pour l'export PDF et le filtre recherche sans recalculer
+  const exportBtn = document.getElementById('stock-export-btn');
+  if (exportBtn) exportBtn.style.display = S.dernierStockCalcule.length ? '' : 'none';
+  renderStockList();
+};
+
+window.filtreStock = function(val) {
+  S.stockFiltre = val;
+  renderStockList();
+};
+
+function renderStockList() {
+  const el = document.getElementById('stock-page-content');
   if (!el) return;
-  const boutons = '<div style="display:flex;gap:8px;margin-bottom:10px;">' +
-    '<button class="btn btn-secondary btn-sm" onclick="ouvrirChoixAchat()">+ Ajouter un achat</button>' +
-    (toutes.length ? '<button class="btn btn-secondary btn-sm" onclick="exportStockPdf()">🖨️ Export PDF</button>' : '') +
-    '</div>';
+  const filtre = (S.stockFiltre || '').toUpperCase().trim();
+  const toutes = (S.dernierStockCalcule || []).filter(l => !filtre || l.nom.toUpperCase().includes(filtre));
   if (!toutes.length) {
-    el.innerHTML = boutons + '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">Aucun stock disponible</div></div>';
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📦</div><div class="empty-text">Aucun stock disponible</div></div>';
     return;
   }
   const cats = [...new Set(toutes.map(l => l.cat))];
-  el.innerHTML = boutons + cats.map(cat => {
+  el.innerHTML = cats.map(cat => {
     const lignes = toutes.filter(l => l.cat === cat).sort((a,b) => a.nom.localeCompare(b.nom));
     return '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--vert);margin:10px 0 4px;">' + cat + '</div>' +
       '<div class="table-wrap"><table><tbody>' +
@@ -1837,7 +1869,7 @@ window.majListeProduitsAchat = function() {
     items.map(it => '<option value="' + kind + '||' + it.id + '">' + it.nom + '</option>').join('');
 };
 
-window.ajouterAchat = function(kind, id, nom, unite) {
+window.ajouterAchat = function(kind, id, nom, unite, retourPid) {
   const body =
     '<div class="form-group"><label>Quantite achetee (' + (unite || 'unite') + ') pour ' + nom + '</label>' +
     '<input type="number" step="0.01" min="0" id="achat-qte" autofocus></div>';
@@ -1849,7 +1881,11 @@ window.ajouterAchat = function(kind, id, nom, unite) {
     try {
       await setDoc(baseDoc(btype, kind === 'engrais' ? 'engrais' : 'produits', id), { achatsTotal: increment(qte) }, { merge: true });
       toast('Achat enregistre');
-      openStockRapide();
+      if (retourPid) {
+        if (kind === 'engrais') openEngraisModal(retourPid); else openProduitModal(retourPid, null);
+      } else {
+        openStockRapide();
+      }
     } catch (e) { toast('Erreur : ' + e.message, true); }
   });
 };
@@ -2005,8 +2041,14 @@ window.openEngraisModal = function(eid) {
       '<div class="form-group"><label>MgO</label><input type="number" id="fe-mgo" step="0.1" value="' + (c.mgo||'') + '"></div>' +
       '<div class="form-group"><label>SO3 (soufre)</label><input type="number" id="fe-so3" step="0.1" value="' + (c.so3||'') + '"></div>' +
       '<div class="form-group"><label>Fe (fer chelate)</label><input type="number" id="fe-fe" step="0.1" value="' + (c.fe||'') + '"></div>' +
-    '</div>';
+    '</div>' +
+    (e ? '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--gris-l);">' +
+      '<label style="display:block;font-size:12px;color:var(--gris);margin-bottom:2px;">Stock actuel</label>' +
+      '<span id="fe-stock-val" style="font-weight:600;">Calcul en cours...</span> ' +
+      '<button type="button" class="btn btn-icon" onclick="ajouterAchat(\'engrais\',\'' + e.id + '\',\'' + e.nom.replace(/'/g,"\\'") + '\',\'' + uniteStock(e.unite) + '\',\'' + e.id + '\')" title="Ajouter un achat">+</button>' +
+    '</div>' : '');
   openModal(e ? 'Modifier l\'engrais' : 'Nouvel engrais', body, () => saveEngrais(eid));
+  if (e) remplirStockModal('engrais', e.id, 'fe-stock-val');
 };
 
 async function saveEngrais(eid) {
@@ -2174,7 +2216,7 @@ window.openPassageModal = function(pid, dupData) {
       '</div></div>';
   }).join('');
 
-  const numVal = p ? p.num : cpPassages().filter(x=>x.type!=='engrais').length+1;
+  const numVal = p ? p.num : nextPassageNum('phyto');
   const dreVal = p ? p.dre||0 : 0;
   const body =
     '<div style="display:flex;gap:12px;margin-bottom:12px;">' +
@@ -2343,10 +2385,10 @@ window.duplicatePassage = function(id) {
   const clone = JSON.parse(JSON.stringify(src));
   delete clone.id;
   if (src.type === 'engrais') {
-    clone.num = cpPassages().filter(x => x.type === 'engrais').length + 1;
+    clone.num = nextPassageNum('engrais');
     openPassageEngraisModal(null, clone);
   } else {
-    clone.num = cpPassages().filter(x => x.type !== 'engrais').length + 1;
+    clone.num = nextPassageNum('phyto');
     openPassageModal(null, clone);
   }
   toast('Passage duplique — verifiez la date avant d\'enregistrer');
@@ -2388,7 +2430,7 @@ window.openPassageEngraisModal = function(pid, dupData) {
           '</div></div>';
       }).join('');
 
-  const numValEng = p ? p.num : cpPassages().filter(x=>x.type==='engrais').length+1;
+  const numValEng = p ? p.num : nextPassageNum('engrais');
   const body =
     '<div style="display:flex;gap:12px;margin-bottom:12px;">' +
       '<div class="form-group" style="max-width:130px;"><label>Passage N (auto)</label><input type="number" id="fe-num" value="' + numValEng + '" readonly style="background:var(--vert-xxl);color:var(--vert);font-weight:600;"></div>' +
@@ -2505,9 +2547,39 @@ window.openProduitModal = function(pid, defCat) {
       '<div class="form-group"><label>DRE (heures)</label><input type="number" id="fp-dre" value="' + (p?p.dre||0:0) + '"></div>' +
       '<div class="form-group"><label>DAR (jours)</label><input type="number" id="fp-dar" value="' + (p?p.dar||0:0) + '"></div>' +
       '<div class="form-group full"><label>Dose de reference IFT (optionnel)</label><input type="number" id="fp-doseref" step="0.01" value="' + (p?p.doseReference||'':'') + '" placeholder="laisser vide si non concerne par l IFT"></div>' +
-    '</div>';
+    '</div>' +
+    (p ? '<div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--gris-l);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">' +
+      '<div><label style="display:block;font-size:12px;color:var(--gris);margin-bottom:2px;">Stock actuel</label>' +
+        '<span id="fp-stock-val" style="font-weight:600;">Calcul en cours...</span> ' +
+        '<button type="button" class="btn btn-icon" onclick="ajouterAchat(\'phyto\',\'' + p.id + '\',\'' + p.nom.replace(/'/g,"\\'") + '\',\'' + uniteStock(p.unite) + '\',\'' + p.id + '\')" title="Ajouter un achat">+</button>' +
+      '</div>' +
+      '<button type="button" class="btn btn-secondary btn-sm" onclick="toggleArchiveProduit(\'' + p.id + '\',' + (p.actif===false?'true':'false') + '); closeModal();">' + (p.actif===false?'♻️ Reactiver':'📦 Archiver') + '</button>' +
+    '</div>' : '');
   openModal(p ? 'Modifier le produit' : 'Nouveau produit', body, () => saveProduit(pid));
+  if (p) remplirStockModal('phyto', p.id, 'fp-stock-val');
 };
+
+// Calcule et affiche le stock d'un seul produit/engrais dans un modal (ex: fiche produit).
+async function remplirStockModal(kind, id, elId) {
+  const ex = getEx();
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  const { consoPhyto, consoEngrais } = await fetchConsommationParType(btype);
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (kind === 'engrais') {
+    const eg = S.engrais.find(x => x.id === id);
+    if (!eg) return;
+    const key = eg.nom + '||' + (eg.categorie || '');
+    const stock = (eg.achatsTotal || 0) - (consoEngrais[key] || 0);
+    el.textContent = stock.toFixed(1) + ' ' + uniteStock(eg.unite);
+  } else {
+    const p = S.produits.find(x => x.id === id);
+    if (!p) return;
+    const key = p.nom + '||' + p.cat;
+    const stock = (p.achatsTotal || 0) - (consoPhyto[key] || 0);
+    el.textContent = stock.toFixed(1) + ' ' + uniteStock(p.unite);
+  }
+}
 
 async function saveProduit(pid) {
   const nom = document.getElementById('fp-nom').value.toUpperCase().trim();
