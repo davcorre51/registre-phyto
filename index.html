@@ -582,8 +582,14 @@ function calcIFT(passage) {
   if (!surfaceTraitee) return 0;
   let total = 0;
   (passage.produitsList||[]).forEach(pr => {
-    const catNorm = (pr.cat||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    if (catNorm.includes('BIOCONTROLE')) return; // exclu de l'IFT (methode IFT hors biocontrole)
+    const catObj = S.categories.find(c => c.nom === pr.cat);
+    // Categorie retrouvee : on se fie au champ explicite exclureIFT.
+    // Si le champ n'a jamais ete renseigne (categorie creee avant ce champ, pas encore migree),
+    // on retombe sur l'ancienne detection par nom en filet de securite.
+    const exclu = catObj && catObj.exclureIFT !== undefined
+      ? catObj.exclureIFT
+      : (pr.cat||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes('BIOCONTROLE');
+    if (exclu) return; // exclu de l'IFT (methode IFT hors biocontrole)
     const doseRef = pr.doseReferenceIFT;
     if (doseRef===null || doseRef===undefined || !Number.isFinite(doseRef) || doseRef <= 0) return; // pas de dose de reference = produit hors IFT
     const doseAppliquee = parseFloat(pr.qte) || 0;
@@ -2684,49 +2690,65 @@ window.delProduit = function(id, nom) {
 window.openCatModal = function() {
   openModal(
     'Nouvelle categorie',
-    '<div class="form-group"><label>Nom de la categorie</label><input type="text" id="fc-nom" placeholder="ex: Herbicides"></div>',
+    '<div class="form-group"><label>Nom de la categorie</label><input type="text" id="fc-nom" placeholder="ex: Herbicides"></div>' +
+    '<div class="form-group" style="margin-top:10px;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
+      '<input type="checkbox" id="fc-exclureift" style="width:18px;height:18px;">' +
+      'Categorie de biocontrole (exclue du calcul de l\'IFT)' +
+    '</label></div>',
     saveCat
   );
 };
 async function saveCat() {
   const nom = document.getElementById('fc-nom').value.trim();
   if (!nom) { toast('Nom requis', true); return; }
+  const exclureIFT = document.getElementById('fc-exclureift').checked;
   const ex = getEx();
   const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
   // Vérifier doublon
   if (S.categories.find(c => c.nom.toLowerCase() === nom.toLowerCase())) {
     toast('Cette categorie existe deja', true); return;
   }
-  await addDoc(baseCol(btype,'categories'), {nom});
+  await addDoc(baseCol(btype,'categories'), {nom, exclureIFT});
   closeModal(); toast('Categorie ajoutee');
 }
 
-// Modifier le nom d'une catégorie
+// Modifier le nom (et le statut biocontrole) d'une catégorie
 window.openEditCatModal = function(id, nomActuel) {
+  const catObj = S.categories.find(c => c.id === id);
   openModal(
     'Modifier la categorie',
-    '<div class="form-group"><label>Nouveau nom</label><input type="text" id="fc-nom-edit" value="' + nomActuel + '"></div>',
+    '<div class="form-group"><label>Nouveau nom</label><input type="text" id="fc-nom-edit" value="' + nomActuel + '"></div>' +
+    '<div class="form-group" style="margin-top:10px;"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;">' +
+      '<input type="checkbox" id="fc-exclureift-edit"' + (catObj && catObj.exclureIFT ? ' checked' : '') + ' style="width:18px;height:18px;">' +
+      'Categorie de biocontrole (exclue du calcul de l\'IFT)' +
+    '</label></div>',
     () => saveEditCat(id, nomActuel)
   );
 };
 async function saveEditCat(id, ancienNom) {
   const nouveauNom = document.getElementById('fc-nom-edit').value.trim();
   if (!nouveauNom) { toast('Nom requis', true); return; }
-  if (nouveauNom === ancienNom) { closeModal(); return; }
+  const exclureIFT = document.getElementById('fc-exclureift-edit').checked;
   const ex = getEx();
   const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
   loading(true);
   try {
-    // 1. Mettre à jour le nom de la catégorie
-    await setDoc(baseDoc(btype,'categories',id), {nom: nouveauNom});
-    // 2. Mettre à jour le champ cat de tous les produits concernés
-    const prodsACorriger = S.produits.filter(p => p.cat === ancienNom);
-    for (const p of prodsACorriger) {
-      await setDoc(baseDoc(btype,'produits',p.id), {...p, cat: nouveauNom});
+    // 1. Mettre à jour le nom et le statut biocontrole de la catégorie (merge pour ne pas ecraser d'autres champs)
+    await setDoc(baseDoc(btype,'categories',id), {nom: nouveauNom, exclureIFT}, {merge:true});
+    // 2. Si le nom a change, mettre à jour le champ cat de tous les produits concernés
+    if (nouveauNom !== ancienNom) {
+      const prodsACorriger = S.produits.filter(p => p.cat === ancienNom);
+      for (const p of prodsACorriger) {
+        await setDoc(baseDoc(btype,'produits',p.id), {...p, cat: nouveauNom});
+      }
+      loading(false);
+      closeModal();
+      toast('Categorie renommee (' + prodsACorriger.length + ' produit(s) mis a jour)');
+      return;
     }
     loading(false);
     closeModal();
-    toast('Categorie renommee (' + prodsACorriger.length + ' produit(s) mis a jour)');
+    toast('Categorie mise a jour');
   } catch(e) {
     loading(false);
     toast('Erreur : ' + e.message, true);
