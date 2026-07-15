@@ -288,6 +288,7 @@ tr:hover td{background:var(--vert-xxl);}
       <div style="display:flex;gap:8px;">
         <button class="btn btn-secondary btn-sm" onclick="ouvrirChoixAchat()">+ Ajouter un achat</button>
         <button class="btn btn-secondary btn-sm" id="stock-export-btn" style="display:none;" onclick="exportStockPdf()">🖨️ Export PDF</button>
+        <button class="btn btn-secondary btn-sm" title="A utiliser si les stocks affiches semblent incorrects (recalcule depuis l'historique complet des passages)" onclick="recalculerConsommation()">🔄 Recalculer</button>
       </div>
     </div>
     <div class="form-group" style="max-width:320px;margin-bottom:12px;">
@@ -1752,46 +1753,98 @@ async function fetchConsommationParType(btype) {
   return { consoPhyto, consoEngrais };
 }
 
-let stockRefreshToken = 0;
-async function refreshStockColumns() {
-  const token = ++stockRefreshToken;
+// Surface effectivement traitee par un passage (memes regles que calcIFT) : somme des surfaces
+// des parcelles concernees, ponderee par le % de surface reellement traite.
+function surfaceTraiteePassage(passageData) {
+  const noms = passageData.parcelles || [];
+  const ids = passageData.parcellesIds || [];
+  const surfaceBrute = noms.reduce((sum, nom, idx) => {
+    const idP = ids[idx];
+    const parc = (idP && S.parcelles.find(pc => pc.id === idP)) || S.parcelles.find(pc => pc.nom === nom);
+    return sum + (parc ? parseFloat(parc.surface) || 0 : 0);
+  }, 0);
+  const pct = Math.min(100, Math.max(0, parseFloat(passageData.pourcentSurface) || 100)) / 100;
+  return surfaceBrute * pct;
+}
+
+// Ajoute (sign=+1) ou retire (sign=-1) la consommation d'un passage sur le compteur consommeTotal
+// des produits/engrais concernes (champ sur bases/{type}/produits|engrais, partage entre CORRE et VADEZ).
+// Appele a chaque creation/modification/suppression de passage - evite de tout relire a chaque affichage du stock.
+async function applyConsommation(passageData, sign) {
+  if (!passageData) return;
+  const surface = surfaceTraiteePassage(passageData);
+  if (!surface) return;
   const ex = getEx();
   const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
-  const { consoPhyto, consoEngrais } = await fetchConsommationParType(btype);
-  if (token !== stockRefreshToken) return; // une demande plus recente a pris le relais
+  const isEngrais = passageData.type === 'engrais';
+  const lignes = isEngrais ? (passageData.engraisList || []) : (passageData.produitsList || []);
+  const writes = [];
+  lignes.forEach(l => {
+    const qte = parseFloat(l.qte) || 0;
+    if (!qte) return;
+    const base = isEngrais
+      ? S.engrais.find(e => e.nom === l.nom && (e.categorie||'') === (l.categorie||''))
+      : S.produits.find(p => p.nom === l.nom && (p.cat||'') === (l.cat||''));
+    if (!base) return; // produit introuvable dans la base (supprime entre-temps) : consommation non comptabilisee
+    const delta = sign * qte * surface;
+    writes.push(setDoc(baseDoc(btype, isEngrais ? 'engrais' : 'produits', base.id), { consommeTotal: increment(delta) }, { merge: true }));
+  });
+  if (writes.length) { try { await Promise.all(writes); } catch (e) { console.error('Erreur mise a jour consommation', e); } }
+}
+
+// Recalcul complet de consommeTotal a partir de tout l'historique (relit passages + parcelles).
+// A utiliser une seule fois pour initialiser le compteur, puis seulement en filet de securite
+// si un ecart est suspecte (les mises a jour normales passent desormais par applyConsommation()).
+async function recalculerConsommation() {
+  const ex = getEx();
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  loading(true);
+  try {
+    const { consoPhyto, consoEngrais } = await fetchConsommationParType(btype);
+    const writes = [];
+    S.produits.forEach(p => {
+      const key = p.nom + '||' + p.cat;
+      writes.push(setDoc(baseDoc(btype,'produits',p.id), { consommeTotal: consoPhyto[key] || 0 }, { merge: true }));
+    });
+    S.engrais.forEach(eg => {
+      const key = eg.nom + '||' + (eg.categorie||'');
+      writes.push(setDoc(baseDoc(btype,'engrais',eg.id), { consommeTotal: consoEngrais[key] || 0 }, { merge: true }));
+    });
+    await Promise.all(writes);
+    toast('Consommation recalculee');
+    refreshStockColumns();
+  } catch (e) { toast('Erreur : ' + e.message, true); }
+  loading(false);
+}
+window.recalculerConsommation = recalculerConsommation;
+
+// Stock = achats - consommation. consommeTotal est deja tenu a jour en direct (applyConsommation),
+// donc plus besoin de relire tous les passages ici : simple lecture des champs deja charges (S.produits/S.engrais).
+function refreshStockColumns() {
   S.produits.forEach(p => {
     const el = document.getElementById('stock-col-p-' + p.id);
     if (!el) return;
-    const key = p.nom + '||' + p.cat;
-    const stock = (p.achatsTotal || 0) - (consoPhyto[key] || 0);
+    const stock = (p.achatsTotal || 0) - (p.consommeTotal || 0);
     el.textContent = stock.toFixed(1) + ' ' + uniteStock(p.unite);
     el.style.color = stock <= 0 ? 'var(--rouge)' : 'var(--gris)';
   });
   S.engrais.forEach(eg => {
     const el = document.getElementById('stock-col-e-' + eg.id);
     if (!el) return;
-    const key = eg.nom + '||' + (eg.categorie || '');
-    const stock = (eg.achatsTotal || 0) - (consoEngrais[key] || 0);
+    const stock = (eg.achatsTotal || 0) - (eg.consommeTotal || 0);
     el.textContent = stock.toFixed(1) + ' ' + uniteStock(eg.unite);
     el.style.color = stock <= 0 ? 'var(--rouge)' : 'var(--gris)';
   });
 }
 
-window.openStockRapide = async function() {
+window.openStockRapide = function() {
   showPage('stock');
-  const ex = getEx();
-  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
-  const el = document.getElementById('stock-page-content');
-  if (el) el.innerHTML = 'Calcul en cours...';
-  const { consoPhyto, consoEngrais } = await fetchConsommationParType(btype);
   const lignesPhyto = S.produits.filter(p => p.actif !== false).map(p => {
-    const key = p.nom + '||' + p.cat;
-    const stock = (p.achatsTotal || 0) - (consoPhyto[key] || 0);
+    const stock = (p.achatsTotal || 0) - (p.consommeTotal || 0);
     return { id: p.id, kind: 'phyto', nom: p.nom, cat: p.cat || 'Autre', unite: uniteStock(p.unite), stock };
   }).filter(l => l.stock > 0);
   const lignesEngrais = S.engrais.map(eg => {
-    const key = eg.nom + '||' + (eg.categorie || '');
-    const stock = (eg.achatsTotal || 0) - (consoEngrais[key] || 0);
+    const stock = (eg.achatsTotal || 0) - (eg.consommeTotal || 0);
     return { id: eg.id, kind: 'engrais', nom: eg.nom, cat: (eg.categorie || 'Autre') + ' (engrais)', unite: uniteStock(eg.unite), stock };
   }).filter(l => l.stock > 0);
   S.dernierStockCalcule = [...lignesPhyto, ...lignesEngrais]; // reutilise pour l'export PDF et le filtre recherche sans recalculer
@@ -2364,15 +2417,20 @@ async function savePassage(pid) {
   };
   try {
     const eid = S.currentId;
+    const oldData = pid ? S.passages.find(x => x.id === pid) : null;
     if (pid) await updateDoc(subdoc(eid,'passages',pid), data);
     else { data.createdAt = serverTimestamp(); await addDoc(sub(eid,'passages'), data); }
+    if (oldData) await applyConsommation(oldData, -1); // retire l'ancienne consommation avant d'appliquer la nouvelle
+    await applyConsommation(data, +1);
     closeModal(); toast('Passage enregistre');
   } catch(e) { toast('Erreur : ' + e.message, true); }
 }
 
 window.delPassage = function(id) {
   confirm2('Supprimer ce passage ?', 'Cette action est irreversible.', async () => {
+    const oldData = S.passages.find(x => x.id === id);
     await deleteDoc(subdoc(S.currentId,'passages',id));
+    if (oldData) await applyConsommation(oldData, -1);
     toast('Passage supprime');
   });
 };
@@ -2525,8 +2583,11 @@ async function savePassageEngrais(pid) {
   };
   try {
     const eid = S.currentId;
+    const oldData = pid ? S.passages.find(x => x.id === pid) : null;
     if (pid) await updateDoc(subdoc(eid,'passages',pid), data);
     else { data.createdAt = serverTimestamp(); await addDoc(sub(eid,'passages'), data); }
+    if (oldData) await applyConsommation(oldData, -1);
+    await applyConsommation(data, +1);
     closeModal(); toast('Passage engrais enregistre');
   } catch(e) { toast('Erreur : ' + e.message, true); }
 }
@@ -2560,23 +2621,18 @@ window.openProduitModal = function(pid, defCat) {
 };
 
 // Calcule et affiche le stock d'un seul produit/engrais dans un modal (ex: fiche produit).
-async function remplirStockModal(kind, id, elId) {
-  const ex = getEx();
-  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
-  const { consoPhyto, consoEngrais } = await fetchConsommationParType(btype);
+function remplirStockModal(kind, id, elId) {
   const el = document.getElementById(elId);
   if (!el) return;
   if (kind === 'engrais') {
     const eg = S.engrais.find(x => x.id === id);
     if (!eg) return;
-    const key = eg.nom + '||' + (eg.categorie || '');
-    const stock = (eg.achatsTotal || 0) - (consoEngrais[key] || 0);
+    const stock = (eg.achatsTotal || 0) - (eg.consommeTotal || 0);
     el.textContent = stock.toFixed(1) + ' ' + uniteStock(eg.unite);
   } else {
     const p = S.produits.find(x => x.id === id);
     if (!p) return;
-    const key = p.nom + '||' + p.cat;
-    const stock = (p.achatsTotal || 0) - (consoPhyto[key] || 0);
+    const stock = (p.achatsTotal || 0) - (p.consommeTotal || 0);
     el.textContent = stock.toFixed(1) + ' ' + uniteStock(p.unite);
   }
 }
