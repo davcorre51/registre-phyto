@@ -592,6 +592,18 @@ function calcIFT(passage) {
   return total;
 }
 
+// Echappe les caracteres HTML speciaux dans un texte libre (notes, noms...) avant insertion via innerHTML,
+// pour eviter qu'un "<" ou "&" tape par erreur ne casse l'affichage (voir "Points de vigilance").
+function esc(v) {
+  if (v === null || v === undefined) return '';
+  return String(v)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function toast(msg, err) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -1253,17 +1265,17 @@ function renderPassages(cp) {
       bodyHTML = engs.map(e => {
         const a = e.apportsCalcules || {};
         const apportsTxt = ['n','p','k','mgo','so3','fe'].map(k => a[k] ? k.toUpperCase()+':'+a[k] : null).filter(Boolean).join(' / ') || '-';
-        return '<div class="prod-line"><span style="flex:1;font-weight:600;">' + e.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (e.qte ? '<strong>' + e.qte + '</strong> ' + (e.unite||'') : '') + '</span><span style="font-size:11px;color:var(--vert);min-width:120px;text-align:right;">' + apportsTxt + '</span></div>';
-      }).join('') + (p.applicateurId ? '<div style="margin-top:6px;font-size:12px;color:var(--gris);">Applicateur : ' + (p.applicateurNom||'') + '</div>' : '') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + p.notes + '</div>' : '');
+        return '<div class="prod-line"><span style="flex:1;font-weight:600;">' + esc(e.nom) + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (e.qte ? '<strong>' + e.qte + '</strong> ' + esc(e.unite||'') : '') + '</span><span style="font-size:11px;color:var(--vert);min-width:120px;text-align:right;">' + esc(apportsTxt) + '</span></div>';
+      }).join('') + (p.applicateurId ? '<div style="margin-top:6px;font-size:12px;color:var(--gris);">Applicateur : ' + esc(p.applicateurNom||'') + '</div>' : '') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + esc(p.notes) + '</div>' : '');
       rightBadge = '';
     } else {
     const prods = p.produitsList || [];
     const byCat = {};
     prods.forEach(pr => { if (!byCat[pr.cat]) byCat[pr.cat] = []; byCat[pr.cat].push(pr); });
     bodyHTML = Object.entries(byCat).map(([cat,list]) =>
-      '<div class="prod-cat-title">' + cat + '</div>' +
-      list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + pr.nom + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (pr.qte ? '<strong>' + pr.qte + '</strong> ' + (pr.unite||'') : (pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;margin-left:auto;">DRE ' + pr.dre + 'h</span>' : '<span style="min-width:50px;"></span>') + '</div>').join('')
-    ).join('') + (function(){ var pctTxt = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : ''; var combined = [pctTxt, p.notes||''].filter(Boolean).join(' — '); return combined ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + combined + '</div>' : ''; })();
+      '<div class="prod-cat-title">' + esc(cat) + '</div>' +
+      list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + esc(pr.nom) + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (pr.qte ? '<strong>' + pr.qte + '</strong> ' + esc(pr.unite||'') : esc(pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;margin-left:auto;">DRE ' + pr.dre + 'h</span>' : '<span style="min-width:50px;"></span>') + '</div>').join('')
+    ).join('') + (function(){ var pctTxt = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : ''; var combined = [pctTxt, p.notes||''].filter(Boolean).join(' — '); return combined ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + esc(combined) + '</div>' : ''; })();
     rightBadge = (function(){
       try {
         var d = parseInt(p.dre,10) || 0;
@@ -1300,8 +1312,8 @@ function renderPassages(cp) {
       '<div class="passage-header" onclick="togglePBody(\'pb' + p.id + '\')">' +
         '<div class="passage-num">' + (p.num||'?') + '</div>' +
         '<div><div class="passage-date">' + fmtDate(p.date) + (p.heureDebut ? ' — ' + p.heureDebut : '') + '</div>' +
-        '<div class="passage-meta">' + ((p.parcelles||[]).join(', ')||'Toutes parcelles') + '</div></div>' +
-        '<div class="passage-right"><div style="font-size:11px;color:var(--gris);text-align:right;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.stade||'') + '</div>' +
+        '<div class="passage-meta">' + esc((p.parcelles||[]).join(', ')||'Toutes parcelles') + '</div></div>' +
+        '<div class="passage-right"><div style="font-size:11px;color:var(--gris);text-align:right;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(p.stade||'') + '</div>' +
         '<div style="display:flex;gap:4px;">' + rightBadge + '</div></div>' +
       '</div>' +
       '<div class="passage-body" id="pb' + p.id + '">' + (bodyHTML || '<span style="font-size:12px;color:var(--gris);">Aucun produit saisi.</span>') +
@@ -1666,7 +1678,7 @@ function renderProduits() {
   }
   const filtre = (S.produitsFiltre||'').toUpperCase().trim();
   const matchFiltre = p => !filtre || p.nom.toUpperCase().includes(filtre);
-  const rowHtml = p => '<tr style="' + (p.actif===false ? 'opacity:0.55;' : '') + '"><td style="font-weight:600;">' + (p.favori ? '⭐ ' : '') + p.nom + (p.actif===false ? ' <span style="font-size:10px;color:var(--gris);font-weight:400;">(archive)</span>' : '') + '</td><td>' + (p.qte ? p.qte + ' ' + (p.unite||'') : (p.dose||'-')) + '</td><td>' + (p.dre||0) + '</td><td>' + (p.dar||0) + '</td><td style="font-family:monospace;font-size:11px;">' + (p.amm||'-') + '</td><td>' + (p.doseReference!==null && p.doseReference!==undefined ? p.doseReference : '<span style="color:var(--gris);font-size:11px;">hors IFT</span>') + '</td>' +
+  const rowHtml = p => '<tr style="' + (p.actif===false ? 'opacity:0.55;' : '') + '"><td style="font-weight:600;">' + (p.favori ? '⭐ ' : '') + esc(p.nom) + (p.actif===false ? ' <span style="font-size:10px;color:var(--gris);font-weight:400;">(archive)</span>' : '') + '</td><td>' + (p.qte ? p.qte + ' ' + esc(p.unite||'') : esc(p.dose||'-')) + '</td><td>' + (p.dre||0) + '</td><td>' + (p.dar||0) + '</td><td style="font-family:monospace;font-size:11px;">' + esc(p.amm||'-') + '</td><td>' + (p.doseReference!==null && p.doseReference!==undefined ? p.doseReference : '<span style="color:var(--gris);font-size:11px;">hors IFT</span>') + '</td>' +
     '<td id="stock-col-p-' + p.id + '" style="font-size:12px;color:var(--gris);">...</td>' +
     '<td><div class="td-actions">' +
     '<button class="btn btn-icon" onclick="toggleFavoriProduit(\'' + p.id + '\',' + (p.favori ? 'true' : 'false') + ')" title="' + (p.favori ? 'Retirer des favoris' : 'Marquer comme favori') + '">' + (p.favori ? '⭐' : '☆') + '</button>' +
@@ -1682,7 +1694,7 @@ function renderProduits() {
     const catKey = 'c' + cat.replace(/[^a-z0-9]/gi,'');
     return '<div class="produits-cat-section">' +
       '<div class="produits-cat-header" onclick="toggleCat(\'' + catKey + '\')">' +
-        '<span class="produits-cat-name">' + cat + '</span>' +
+        '<span class="produits-cat-name">' + esc(cat) + '</span>' +
         '<div style="display:flex;align-items:center;gap:8px;">' +
           '<span style="font-size:11px;color:var(--gris);">' + prods.length + ' produit(s)' + (archives.length ? ' + ' + archives.length + ' archive(s)' : '') + '</span>' +
           (catObj ? '<button class="btn btn-icon edt" onclick="event.stopPropagation();openEditCatModal(\'' + catObj.id + '\',\'' + cat + '\')" title="Modifier">✏️</button>' : '') +
@@ -1870,11 +1882,11 @@ function renderStockList() {
   const cats = [...new Set(toutes.map(l => l.cat))];
   el.innerHTML = cats.map(cat => {
     const lignes = toutes.filter(l => l.cat === cat).sort((a,b) => a.nom.localeCompare(b.nom));
-    return '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--vert);margin:10px 0 4px;">' + cat + '</div>' +
+    return '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--vert);margin:10px 0 4px;">' + esc(cat) + '</div>' +
       '<div class="table-wrap"><table><tbody>' +
       lignes.map(l =>
-        '<tr><td style="font-weight:600;">' + l.nom + '</td>' +
-        '<td style="text-align:right;white-space:nowrap;">' + l.stock.toFixed(1) + ' ' + l.unite + '</td>' +
+        '<tr><td style="font-weight:600;">' + esc(l.nom) + '</td>' +
+        '<td style="text-align:right;white-space:nowrap;">' + l.stock.toFixed(1) + ' ' + esc(l.unite) + '</td>' +
         '<td style="text-align:right;white-space:nowrap;">' +
         '<button class="btn btn-icon" onclick="ajouterAchat(\'' + l.kind + '\',\'' + l.id + '\',\'' + l.nom.replace(/'/g,"\\'") + '\',\'' + l.unite + '\')" title="Ajouter un achat">+</button> ' +
         '<button class="btn btn-icon edt" onclick="modifierStock(\'' + l.kind + '\',\'' + l.id + '\',\'' + l.nom.replace(/'/g,"\\'") + '\',\'' + l.unite + '\',' + l.stock + ')" title="Modifier le stock">✏️</button> ' +
@@ -2061,11 +2073,11 @@ function renderEngrais() {
   el.innerHTML = cats.map(cat => {
     const prods = S.engrais.filter(e => (e.categorie||'Autre') === cat);
     return '<div class="produits-cat-section">' +
-      '<div class="produits-cat-header"><span class="produits-cat-name">' + cat + '</span><span style="font-size:11px;color:var(--gris);">' + prods.length + ' produit(s)</span></div>' +
+      '<div class="produits-cat-header"><span class="produits-cat-name">' + esc(cat) + '</span><span style="font-size:11px;color:var(--gris);">' + prods.length + ' produit(s)</span></div>' +
       '<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Dose habituelle</th><th>Composition</th><th>Stock</th><th style="text-align:right;">Actions</th></tr></thead><tbody>' +
       prods.map(e => {
         const compo = ['n','p','k','mgo','so3','fe'].map(k => (e.composition && e.composition[k]) ? k.toUpperCase()+':'+e.composition[k] : null).filter(Boolean).join(' / ') || '-';
-        return '<tr><td style="font-weight:600;">' + e.nom + '</td><td>' + (e.qte ? e.qte+' '+(e.unite||'') : (e.dose||'-')) + '</td><td style="font-size:12px;">' + compo + '</td>' +
+        return '<tr><td style="font-weight:600;">' + esc(e.nom) + '</td><td>' + (e.qte ? e.qte+' '+esc(e.unite||'') : esc(e.dose||'-')) + '</td><td style="font-size:12px;">' + esc(compo) + '</td>' +
           '<td id="stock-col-e-' + e.id + '" style="font-size:12px;color:var(--gris);">...</td>' +
           '<td><div class="td-actions"><button class="btn btn-icon edt" onclick="openEngraisModal(\'' + e.id + '\')" title="Modifier">✏️</button><button class="btn btn-icon del" onclick="delEngrais(\'' + e.id + '\',\'' + e.nom + '\')" title="Supprimer">🗑️</button></div></td></tr>';
       }).join('') +
@@ -2171,8 +2183,8 @@ function renderParcelles() {
       if (p.gps) infos.push(p.gps);
       return '<div class="parcelle-item">' +
         '<div class="parcelle-left">' +
-          '<div class="parcelle-nom">' + p.nom + '</div>' +
-          (infos.length ? '<div class="parcelle-info">' + infos.join(' · ') + '</div>' : '') +
+          '<div class="parcelle-nom">' + esc(p.nom) + '</div>' +
+          (infos.length ? '<div class="parcelle-info">' + esc(infos.join(' · ')) + '</div>' : '') +
         '</div>' +
         '<div class="parcelle-actions">' +
           '<button class="btn btn-icon edt" onclick="openParcelleModal(\'' + p.id + '\')" title="Modifier">&#9998;</button>' +
@@ -2199,9 +2211,9 @@ function renderExploitations() {
     '<div class="exploit-card ' + (e.id === S.currentId ? 'active-exploit' : '') + '">' +
       '<div style="display:flex;align-items:flex-start;justify-content:space-between;">' +
         '<div>' +
-          '<div class="exploit-nom">' + e.nom + '</div>' +
-          '<div class="exploit-siret">SIRET : ' + (e.siret||'Non renseigne') + '</div>' +
-          '<div class="exploit-siret">Certiphyto : ' + (e.certiphyto||'-') + (e.certiphytoDate ? ' &mdash; val. ' + fmtDate(e.certiphytoDate) + (new Date(e.certiphytoDate) < new Date() ? ' <span style="color:var(--rouge);font-weight:700;">EXPIRE</span>' : '') : '') + '</div>' +
+          '<div class="exploit-nom">' + esc(e.nom) + '</div>' +
+          '<div class="exploit-siret">SIRET : ' + esc(e.siret||'Non renseigne') + '</div>' +
+          '<div class="exploit-siret">Certiphyto : ' + esc(e.certiphyto||'-') + (e.certiphytoDate ? ' &mdash; val. ' + fmtDate(e.certiphytoDate) + (new Date(e.certiphytoDate) < new Date() ? ' <span style="color:var(--rouge);font-weight:700;">EXPIRE</span>' : '') : '') + '</div>' +
         '</div>' +
         (e.id === S.currentId ? '<span class="badge badge-vert">Active</span>' : '') +
       '</div>' +
@@ -2241,7 +2253,7 @@ window.openPassageModal = function(pid, dupData) {
   const p = dupData || (pid ? S.passages.find(x => x.id === pid) : null);
   const catNames = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(pr=>pr.cat)])];
   const parOpts = S.parcelles.map(pa =>
-    '<option value="' + pa.nom + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' selected' : '') + '>' + pa.nom + '</option>'
+    '<option value="' + pa.nom + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' selected' : '') + '>' + esc(pa.nom) + '</option>'
   ).join('');
 
   const prodsHTML = catNames.map(cat => {
@@ -2249,7 +2261,7 @@ window.openPassageModal = function(pid, dupData) {
     const catProds = S.produits.filter(pr => pr.cat === cat && (pr.actif !== false || existing.some(e => e.nom === pr.nom))).sort((a,b) => (b.favori?1:0) - (a.favori?1:0));
     if (!catProds.length) return '';
     return '<div class="prod-pills-section">' +
-      '<div class="prod-pills-title">' + cat + '</div>' +
+      '<div class="prod-pills-title">' + esc(cat) + '</div>' +
       '<div class="prod-pills-grid">' +
       catProds.map(pr => {
         const sel = existing.find(e => e.nom === pr.nom);
@@ -2257,7 +2269,7 @@ window.openPassageModal = function(pid, dupData) {
         const selQte = sel ? (sel.qte !== undefined ? sel.qte : extractQte(sel.dose||'')) : (pr.qte || extractQte(pr.dose||''));
         const selUnite = sel ? (sel.unite || extractUnite(sel.dose||'', pr.unite||'L/HA')) : (pr.unite || 'L/HA');
         return '<div class="prod-pill' + (isActive ? ' active' : '') + '" data-cat="' + cat + '" data-nom="' + pr.nom + '" data-dre="' + (pr.dre||0) + '" data-amm="' + (pr.amm||'') + '" data-unite="' + selUnite + '" onclick="togglePill(this)">' +
-          '<div class="prod-pill-name">' + (pr.favori ? '⭐ ' : '') + pr.nom + '</div>' +
+          '<div class="prod-pill-name">' + (pr.favori ? '⭐ ' : '') + esc(pr.nom) + '</div>' +
           '<div class="prod-pill-dose" style="display:flex;align-items:center;gap:4px;">' +
             '<input type="number" class="pill-qte" step="0.01" value="' + (selQte||'') + '" placeholder="qte" onclick="event.stopPropagation()" style="width:60px;">' +
             '<select class="pill-unite" onclick="event.stopPropagation()" style="font-size:11px;padding:4px 5px;border:none;background:transparent;color:var(--vert);font-weight:600;cursor:pointer;">' +
@@ -2311,7 +2323,7 @@ window.openPassageModal = function(pid, dupData) {
       S.parcelles.map(pa =>
         '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--gris-l);border-radius:8px;cursor:pointer;font-size:13px;">' +
         '<input type="checkbox" class="parc-cb" value="' + pa.nom + '" data-id="' + pa.id + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--vert);cursor:pointer;flex-shrink:0;">' +
-        pa.nom + '</label>'
+        esc(pa.nom) + '</label>'
       ).join('') +
       '</div>' +
       (function(){
@@ -2335,11 +2347,11 @@ window.openPassageModal = function(pid, dupData) {
         '<option value="">— ' + (getEx()?getEx().nom:'Exploitation') + ' (par defaut) —</option>' +
         (S.applicateurs||[]).map(a => {
           const expire = a.certiphytoDate && new Date(a.certiphytoDate) < new Date();
-          return '<option value="' + a.id + '"' + (p&&p.applicateurId===a.id?' selected':'') + (expire?' style="color:var(--rouge);"':'') + '>' + a.nom + (expire?' ⚠ EXPIRE':'') + '</option>';
+          return '<option value="' + a.id + '"' + (p&&p.applicateurId===a.id?' selected':'') + (expire?' style="color:var(--rouge);"':'') + '>' + esc(a.nom) + (expire?' ⚠ EXPIRE':'') + '</option>';
         }).join('') +
       '</select>' +
     '</div>' +
-    '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="f-notes" rows="3" placeholder="Conditions meteo...">' + (p?p.notes||'':'') + '</textarea></div>' +
+    '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="f-notes" rows="3" placeholder="Conditions meteo...">' + esc(p?p.notes||'':'') + '</textarea></div>' +
     '<div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="insertGPSNotes()">📍 Inserer GPS parcelles</button></div>';
 
   openModal(pid ? 'Modifier le passage' : (dupData ? 'Nouveau passage (duplique)' : 'Nouveau passage'), body, () => savePassage(pid));
@@ -2347,7 +2359,7 @@ window.openPassageModal = function(pid, dupData) {
 
 function prodLineHTML(cat, existing, catProds) {
   const opts = catProds.map(p =>
-    '<option value="' + p.nom + '" data-dose="' + (p.dose||'') + '" data-dre="' + (p.dre||0) + '"' + (existing&&existing.nom===p.nom?' selected':'') + '>' + p.nom + '</option>'
+    '<option value="' + p.nom + '" data-dose="' + (p.dose||'') + '" data-dre="' + (p.dre||0) + '"' + (existing&&existing.nom===p.nom?' selected':'') + '>' + esc(p.nom) + '</option>'
   ).join('');
   return '<div class="prod-form-row" data-cat="' + cat + '">' +
     '<select style="flex:2;" onchange="autoFillDose(this)" class="psel"><option value="">-- Produit --</option>' + opts + '</select>' +
@@ -2464,7 +2476,7 @@ window.openPassageEngraisModal = function(pid, dupData) {
         const catEngs = S.engrais.filter(eg => (eg.categorie||'Autre') === cat);
         const existing = existingEng.filter(eg => (eg.categorie||'Autre') === cat);
         return '<div class="prod-pills-section">' +
-          '<div class="prod-pills-title">' + cat + '</div>' +
+          '<div class="prod-pills-title">' + esc(cat) + '</div>' +
           '<div class="prod-pills-grid">' +
           catEngs.map(eg => {
             const sel = existing.find(e => e.nom === eg.nom);
@@ -2475,7 +2487,7 @@ window.openPassageEngraisModal = function(pid, dupData) {
             return '<div class="prod-pill eng-pill' + (isActive ? ' active' : '') + '" data-cat="' + cat + '" data-nom="' + eg.nom + '" ' +
               'data-n="' + (c.n||0) + '" data-p="' + (c.p||0) + '" data-k="' + (c.k||0) + '" data-mgo="' + (c.mgo||0) + '" data-so3="' + (c.so3||0) + '" data-fe="' + (c.fe||0) + '" ' +
               'onclick="this.classList.toggle(\'active\')">' +
-              '<div class="prod-pill-name">' + eg.nom + '</div>' +
+              '<div class="prod-pill-name">' + esc(eg.nom) + '</div>' +
               '<div class="prod-pill-dose" style="display:flex;align-items:center;gap:4px;">' +
                 '<input type="number" class="pill-qte" step="0.01" value="' + (selQte||'') + '" placeholder="qte" onclick="event.stopPropagation()" style="width:60px;">' +
                 '<select class="pill-unite" onclick="event.stopPropagation()" style="font-size:11px;padding:4px 5px;border:none;background:transparent;color:var(--vert);font-weight:600;cursor:pointer;">' +
@@ -2507,7 +2519,7 @@ window.openPassageEngraisModal = function(pid, dupData) {
       S.parcelles.map(pa =>
         '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--gris-l);border-radius:8px;cursor:pointer;font-size:13px;">' +
         '<input type="checkbox" class="parc-cb-eng" value="' + pa.nom + '" data-id="' + pa.id + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--vert);cursor:pointer;flex-shrink:0;">' +
-        pa.nom + '</label>'
+        esc(pa.nom) + '</label>'
       ).join('') +
       '</div>' +
     '</div>' +
@@ -2523,7 +2535,7 @@ window.openPassageEngraisModal = function(pid, dupData) {
         }).join('') +
       '</select>' +
     '</div>' +
-    '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="fe-notes" rows="3" placeholder="Conditions, parcelle test...">' + (p?p.notes||'':'') + '</textarea></div>' +
+    '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="fe-notes" rows="3" placeholder="Conditions, parcelle test...">' + esc(p?p.notes||'':'') + '</textarea></div>' +
     '<div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="insertGPSNotesEng()">📍 Inserer GPS parcelles</button></div>';
 
   openModal(pid ? 'Modifier le passage engrais' : (dupData ? 'Nouveau passage engrais (duplique)' : 'Nouveau passage engrais'), body, () => savePassageEngrais(pid));
@@ -2600,7 +2612,7 @@ window.openProduitModal = function(pid, defCat) {
     '<div class="form-grid">' +
       '<div class="form-group full"><label>Nom commercial</label><input type="text" id="fp-nom" value="' + (p?p.nom:'') + '" placeholder="HELIOCUIVRE" style="text-transform:uppercase;"></div>' +
       '<div class="form-group"><label>Categorie</label><select id="fp-cat">' +
-        catNames.map(c => '<option value="' + c + '"' + ((p&&p.cat===c)||(defCat===c)?' selected':'') + '>' + c + '</option>').join('') +
+        catNames.map(c => '<option value="' + c + '"' + ((p&&p.cat===c)||(defCat===c)?' selected':'') + '>' + esc(c) + '</option>').join('') +
       '</select></div>' +
       '<div class="form-group"><label>N AMM</label><input type="text" id="fp-amm" value="' + (p?p.amm||'':'') + '" placeholder="7 chiffres"></div>' +
       '<div class="form-group"><label>Dose recommandee</label><input type="number" id="fp-qte" step="0.01" value="' + (p?p.qte||'':'') + '" placeholder="ex: 1.5"></div>' +
@@ -2868,8 +2880,8 @@ function renderApplicateursSection() {
         const expire = a.certiphytoDate && new Date(a.certiphytoDate) < new Date();
         return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--gris-l);border-radius:var(--r-sm);">' +
           '<div>' +
-            '<div style="font-weight:600;font-size:13px;">' + a.nom + (expire ? ' <span style="color:var(--rouge);font-size:11px;">⚠ Certiphyto expire</span>' : '') + '</div>' +
-            '<div style="font-size:11px;color:var(--gris);">SIRET : ' + (a.siret||'-') + ' &nbsp;·&nbsp; Certiphyto : ' + (a.certiphyto||'-') + (a.certiphytoDate ? ' (val. ' + fmtDate(a.certiphytoDate) + ')' : '') + '</div>' +
+            '<div style="font-weight:600;font-size:13px;">' + esc(a.nom) + (expire ? ' <span style="color:var(--rouge);font-size:11px;">⚠ Certiphyto expire</span>' : '') + '</div>' +
+            '<div style="font-size:11px;color:var(--gris);">SIRET : ' + esc(a.siret||'-') + ' &nbsp;·&nbsp; Certiphyto : ' + esc(a.certiphyto||'-') + (a.certiphytoDate ? ' (val. ' + fmtDate(a.certiphytoDate) + ')' : '') + '</div>' +
           '</div>' +
           '<div style="display:flex;gap:4px;">' +
             '<button class="btn btn-icon edt" onclick="openApplicateurModal(\'' + a.id + '\')" title="Modifier">✏️</button>' +
@@ -2930,7 +2942,7 @@ function renderSitesMeteoSection() {
       '<div style="display:flex;flex-direction:column;gap:6px;">' +
       sites.map(s => '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--gris-l);border-radius:var(--r-sm);">' +
           '<div>' +
-            '<div style="font-weight:600;font-size:13px;">' + s.nom + (s.cp ? ' (' + s.cp + ')' : '') + '</div>' +
+            '<div style="font-weight:600;font-size:13px;">' + esc(s.nom) + (s.cp ? ' (' + esc(s.cp) + ')' : '') + '</div>' +
             '<div style="font-size:11px;color:var(--gris);">' + s.lat.toFixed(4) + ', ' + s.lon.toFixed(4) + '</div>' +
           '</div>' +
           '<div style="display:flex;gap:4px;">' +
