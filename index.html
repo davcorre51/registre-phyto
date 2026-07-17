@@ -3022,7 +3022,10 @@ function renderSitesMeteoSection() {
   return '<div style="margin-top:14px;border-top:1px solid var(--gris-l);padding-top:14px;">' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
       '<div style="font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.5px;">🌧️ Sites meteo (pluviometrie)</div>' +
-      '<button class="btn btn-primary btn-sm" onclick="openSiteMeteoModal(null)">+ Ajouter</button>' +
+      '<div style="display:flex;gap:6px;">' +
+        '<button class="btn btn-secondary btn-sm" onclick="openImportCsvModal()">📥 Importer CSV</button>' +
+        '<button class="btn btn-primary btn-sm" onclick="openSiteMeteoModal(null)">+ Ajouter</button>' +
+      '</div>' +
     '</div>' +
     (sites.length === 0 ?
       '<div style="font-size:12px;color:var(--gris);opacity:.6;">Aucune commune suivie — ajoutez-en une pour voir la pluviometrie sur le tableau de bord.</div>' :
@@ -3103,6 +3106,136 @@ window.delSiteMeteo = function(id, nom) {
     toast('Site meteo supprime');
   });
 };
+
+// ── IMPORT CSV PLUVIOMETRIE (releves de stations locales, plus precis qu'Open-Meteo) ──
+// Format attendu (export type station meteo perso) : separateur ";", dates JJ/MM/AAAA,
+// une colonne "<NOM STATION> Pluies quotidiennes (mm)" par station suivie (+ une colonne
+// "Precipitations cumulees (mm)" ignoree, le cumul est recalcule par l'appli). Les valeurs
+// importees ECRASENT celles deja stockees pour les memes jours dans exploitations/{id}/pluviometrie
+// (source station jugee plus fiable qu'Open-Meteo) ; les jours non couverts par l'import restent
+// inchanges. Voir STRUCTURE.md.
+function normText(s) {
+  return (s || '').toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+window.openImportCsvModal = function() {
+  S.csvImportParsed = null;
+  const body =
+    '<div style="font-size:12px;color:var(--gris);margin-bottom:10px;">Importez un export CSV de vos stations locales. Les valeurs remplaceront celles d\'Open-Meteo pour les memes jours.</div>' +
+    '<div class="form-group full"><label>Fichier CSV</label><input type="file" id="csv-file-input" accept=".csv,text/csv" onchange="handleCsvFileSelect(event)"></div>' +
+    '<div class="form-group full"><label>Ou collez le contenu ici</label><textarea id="csv-paste-input" rows="6" placeholder="date;&quot;FONTAINE Pluies quotidiennes (mm)&quot;;...&#10;01/01/2026;0;..."></textarea></div>' +
+    '<div id="csv-analyse-status" style="font-size:12px;color:var(--gris);margin-top:8px;"></div>' +
+    '<div id="csv-mapping-zone"></div>' +
+    '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="analyserCsvImport()">🔍 Analyser le fichier</button>';
+  openModal('Importer pluviometrie (CSV station)', body, null);
+  document.getElementById('modal-save-btn').style.display = 'none';
+};
+
+window.handleCsvFileSelect = function(evt) {
+  const file = evt.target.files && evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => { document.getElementById('csv-paste-input').value = reader.result; };
+  reader.onerror = () => toast('Erreur de lecture du fichier', true);
+  reader.readAsText(file, 'UTF-8');
+};
+
+// Parse le texte CSV -> { stations:[{label, colIndex}], rows:[{iso, values:{label:mm}}] }
+function parseCsvPluvio(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length);
+  if (lines.length < 2) throw new Error('Fichier vide ou incomplet');
+  const header = lines[0].split(';').map(h => h.replace(/^"|"$/g, '').trim());
+  const stations = [];
+  header.forEach((h, idx) => {
+    const m = h.match(/^(.+?)\s+Pluies quotidiennes/i);
+    if (m) stations.push({ label: m[1].trim(), colIndex: idx });
+  });
+  if (!stations.length) throw new Error('Aucune colonne "Pluies quotidiennes" reconnue dans l\'en-tete');
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cells = lines[i].split(';');
+    const iso = toISO(cells[0]);
+    if (!iso) continue;
+    const values = {};
+    stations.forEach(s => { values[s.label] = parseFloat((cells[s.colIndex] || '0').replace(',', '.')) || 0; });
+    rows.push({ iso, values });
+  }
+  if (!rows.length) throw new Error('Aucune ligne de donnees exploitable');
+  return { stations, rows };
+}
+
+window.analyserCsvImport = function() {
+  const text = document.getElementById('csv-paste-input').value;
+  const status = document.getElementById('csv-analyse-status');
+  if (!text || !text.trim()) { status.innerHTML = '<span style="color:var(--rouge);">Selectionnez un fichier ou collez le contenu du CSV.</span>'; return; }
+  let parsed;
+  try { parsed = parseCsvPluvio(text); }
+  catch (e) { status.innerHTML = '<span style="color:var(--rouge);">Erreur : ' + esc(e.message) + '</span>'; return; }
+  S.csvImportParsed = parsed;
+  const sites = S.sitesMeteoByExploit[S.currentId] || [];
+  const dates = parsed.rows.map(r => r.iso).sort();
+  status.innerHTML = '<span style="color:var(--vert);">✓ ' + parsed.stations.length + ' station(s) detectee(s), ' + parsed.rows.length + ' jours (' + dates[0] + ' → ' + dates[dates.length - 1] + ')</span>';
+  const zone = document.getElementById('csv-mapping-zone');
+  zone.innerHTML = '<div style="margin-top:12px;font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;">Correspondance avec vos sites meteo</div>' +
+    parsed.stations.map((s, idx) => {
+      // Auto-detection : egalite normalisee, sinon inclusion partielle dans un sens ou l'autre
+      // (ex : "FONTAINE" dans le CSV <-> "Fontaine Denis" configure dans l'appli)
+      const ns = normText(s.label);
+      let best = sites.find(site => normText(site.nom) === ns);
+      if (!best) best = sites.find(site => normText(site.nom).includes(ns) || ns.includes(normText(site.nom)));
+      const options = '<option value="">— Ignorer cette colonne —</option>' +
+        sites.map(site => '<option value="' + site.id + '"' + (best && best.id === site.id ? ' selected' : '') + '>' + esc(site.nom) + '</option>').join('');
+      return '<div class="form-group full" style="margin-top:6px;"><label>' + esc(s.label) + '</label>' +
+        '<select id="csv-map-' + idx + '">' + options + '</select></div>';
+    }).join('');
+  const btn = document.getElementById('modal-save-btn');
+  btn.style.display = '';
+  btn.textContent = 'Importer';
+  btn.onclick = confirmerImportCsv;
+};
+
+async function confirmerImportCsv() {
+  const parsed = S.csvImportParsed;
+  if (!parsed) return;
+  const sites = S.sitesMeteoByExploit[S.currentId] || [];
+  const mapping = parsed.stations.map((s, idx) => {
+    const sel = document.getElementById('csv-map-' + idx);
+    const siteId = sel ? sel.value : '';
+    return siteId ? { label: s.label, site: sites.find(x => x.id === siteId) } : null;
+  }).filter(Boolean);
+  if (!mapping.length) { toast('Selectionnez au moins un site a importer', true); return; }
+  loading(true);
+  try {
+    for (const m of mapping) {
+      // Regroupe les jours importes par annee (un document pluviometrie par site + annee)
+      const parYear = {};
+      parsed.rows.forEach(r => {
+        const val = r.values[m.label];
+        if (val === undefined) return;
+        const y = r.iso.slice(0, 4);
+        (parYear[y] = parYear[y] || {})[r.iso] = val;
+      });
+      for (const [year, jours] of Object.entries(parYear)) {
+        const docId = m.site.id + '_' + year;
+        const existingSnap = await getDoc(subdoc(S.currentId, 'pluviometrie', docId));
+        const existingJours = existingSnap.exists() ? (existingSnap.data().jours || {}) : {};
+        // Les valeurs importees (station) ecrasent celles deja stockees (Open-Meteo) pour les memes jours
+        const merged = Object.assign({}, existingJours, jours);
+        await setDoc(subdoc(S.currentId, 'pluviometrie', docId),
+          { site: m.site.id, label: m.site.nom, annee: year, jours: merged, updatedAt: serverTimestamp() },
+          { merge: true });
+      }
+    }
+    resetRainfallSync();
+    closeModal();
+    render();
+    toast('Pluviometrie importee (' + mapping.length + ' site(s))');
+  } catch (e) {
+    toast('Erreur import : ' + e.message, true);
+  } finally {
+    loading(false);
+  }
+}
 
 window.switchExploit = function(id) {
   if (id === S.currentId) return;
