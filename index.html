@@ -232,8 +232,6 @@ tr:hover td{background:var(--vert-xxl);}
       <div class="stat-card rouge" id="pluvio-stat-card" onclick="cyclePluvioStation()"><div class="stat-label">Pluviometrie</div><div class="stat-val" id="stat-pluvio">-</div><div class="stat-unit">mm depuis le 1er janvier</div><div id="stat-pluvio-site" style="font-size:12px;color:var(--gris);margin-top:2px;"></div></div>
     </div>
 
-    <button class="btn btn-secondary" style="margin-bottom:14px;" onclick="openStockRapide()">📦 Stock rapide</button>
-
     <div class="card" id="rainfall-card" style="display:none;">
       <div class="card-title">🌧️ Pluviometrie depuis le dernier traitement</div>
       <div id="rainfall-content"></div>
@@ -261,7 +259,7 @@ tr:hover td{background:var(--vert-xxl);}
     <div id="pluvio-page-controls" class="campagne-bar"></div>
     <div class="card">
       <div id="pluvio-page-stats" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;"></div>
-      <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <div style="display:flex;gap:6px;margin-bottom:18px;">
         <div class="tab active" id="pvtab-mensuel" onclick="setPluvioPageView('mensuel')" style="border-radius:50px;padding:8px 16px;">Mensuel</div>
         <div class="tab" id="pvtab-cumule" onclick="setPluvioPageView('cumule')" style="border-radius:50px;padding:8px 16px;">Cumule</div>
       </div>
@@ -1880,22 +1878,9 @@ function renderPluvioPageStats(jours, joursPrec, year) {
     deltaHtml = '<div><div style="font-size:11px;color:var(--gris);">vs ' + prevYear + ' (meme periode)</div><div style="font-size:15px;font-weight:700;color:' + (delta >= 0 ? 'var(--vert)' : 'var(--rouge)') + ';">' + sign + delta.toFixed(0) + ' mm</div></div>';
   }
 
-  let dryHtml = '';
-  if (isCurrentYear) {
-    let count = 0;
-    let d = new Date(todayISO + 'T00:00:00');
-    const min = new Date(janISO + 'T00:00:00');
-    while (d >= min) {
-      const iso = d.toISOString().slice(0, 10);
-      const v = jours[iso];
-      if (v === undefined || v <= 0.1) { count++; d.setDate(d.getDate() - 1); } else break;
-    }
-    dryHtml = '<div><div style="font-size:11px;color:var(--gris);">Jours sans pluie</div><div style="font-size:15px;font-weight:700;">' + count + '</div></div>';
-  }
-
   statsEl.innerHTML =
     '<div><div style="font-size:11px;color:var(--gris);">Cumul depuis le 1er janvier</div><div style="font-size:20px;font-weight:700;color:var(--vert);">' + total.toFixed(0) + ' mm</div></div>' +
-    deltaHtml + dryHtml;
+    deltaHtml;
 }
 
 function drawPluvioPageChart(jours, joursPrec, year) {
@@ -1950,8 +1935,8 @@ function drawPluvioMensuel(chartEl, jours, year) {
     '</div>';
   }).join('');
   chartEl.innerHTML =
-    '<div style="font-size:11px;color:var(--gris);margin-bottom:6px;">Toucher un mois pour le detail quotidien</div>' +
-    '<div style="display:flex;align-items:flex-end;gap:2px;">' + bars + '</div>';
+    '<div style="display:flex;align-items:flex-end;gap:2px;">' + bars + '</div>' +
+    '<div style="font-size:11px;color:var(--gris);margin-top:8px;">Toucher un mois pour le detail quotidien</div>';
 }
 
 // Detail quotidien d'un seul mois (declenche par un clic sur une barre mensuelle) : le nombre
