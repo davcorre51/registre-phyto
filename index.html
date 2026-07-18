@@ -229,7 +229,7 @@ tr:hover td{background:var(--vert-xxl);}
 
       <div class="stat-card" style="border-color:var(--vert);"><div class="stat-label">IFT Total</div><div class="stat-val" id="stat-ift">0</div><div class="stat-unit">campagne en cours (hors biocontrole)</div></div>
 
-      <div class="stat-card rouge"><div class="stat-label">Pluviometrie</div><div class="stat-val" id="stat-pluvio">-</div><div class="stat-unit">mm depuis le 1er janvier</div></div>
+      <div class="stat-card rouge" id="pluvio-stat-card" onclick="cyclePluvioStation()"><div class="stat-label">Pluviometrie</div><div class="stat-val" id="stat-pluvio">-</div><div class="stat-unit">mm depuis le 1er janvier</div><div id="stat-pluvio-site" style="font-size:10px;color:var(--gris);margin-top:2px;"></div></div>
     </div>
 
     <button class="btn btn-secondary" style="margin-bottom:14px;" onclick="openStockRapide()">📦 Stock rapide</button>
@@ -1691,15 +1691,52 @@ function renderRainfallBlock(targetElId, cardElId) {
 
 function renderRainfallCard() { renderRainfallBlock('rainfall-content', 'rainfall-card'); }
 
-// Alimente la stat-card "Pluviometrie" du tableau de bord : cumul depuis le 1er janvier,
-// moyenne des sites meteo configures (un seul site dans la grande majorite des cas).
+// Alimente la stat-card "Pluviometrie" du tableau de bord : cumul depuis le 1er janvier
+// pour UNE station precise (jamais une moyenne, peu justifiee vu les variations locales
+// de pluvio d'une station a l'autre). S'il y a plusieurs sites configures sur l'exploitation,
+// un appui sur la carte fait defiler les stations disponibles ; le choix est memorise
+// par exploitation (localStorage), comme la derniere exploitation consultee.
+function pluvioStationPrefKey(eid) { return 'pluvioStationSite_' + eid; }
+function getPluvioStationKey() {
+  const sites = getSitesMeteo();
+  if (!sites.length) return null;
+  let saved = null;
+  try { saved = localStorage.getItem(pluvioStationPrefKey(S.currentId)); } catch(e) {}
+  if (saved && sites.some(s => s.key === saved)) return saved;
+  return sites[0].key;
+}
+function setPluvioStationKey(key) {
+  try { localStorage.setItem(pluvioStationPrefKey(S.currentId), key); } catch(e) {}
+}
+
+window.cyclePluvioStation = function() {
+  const sites = getSitesMeteo();
+  if (sites.length < 2) return; // un seul site (ou aucun) : rien a faire defiler
+  const current = getPluvioStationKey();
+  const idx = sites.findIndex(s => s.key === current);
+  const next = sites[(idx + 1) % sites.length];
+  setPluvioStationKey(next.key);
+  renderPluvioStat();
+};
+
 function renderPluvioStat() {
   const statEl = document.getElementById('stat-pluvio');
+  const siteEl = document.getElementById('stat-pluvio-site');
+  const card = document.getElementById('pluvio-stat-card');
   if (!statEl) return;
   const eidAtCall = S.currentId;
   const sites = getSitesMeteo();
-  if (!sites.length) { statEl.textContent = '-'; return; }
+  if (!sites.length) {
+    statEl.textContent = '-';
+    if (siteEl) siteEl.textContent = '';
+    if (card) card.style.cursor = 'default';
+    return;
+  }
+  if (card) card.style.cursor = sites.length > 1 ? 'pointer' : 'default';
+  const siteKey = getPluvioStationKey();
+  const site = sites.find(s => s.key === siteKey) || sites[0];
   statEl.textContent = '...';
+  if (siteEl) siteEl.textContent = site.label + (sites.length > 1 ? ' · 👆 changer' : '');
   ensureRainfallSync().then(result => {
     if (S.currentId !== eidAtCall) return;
     const el = document.getElementById('stat-pluvio');
@@ -1707,9 +1744,8 @@ function renderPluvioStat() {
     if (result && result.ok === false) { el.textContent = '?'; return; }
     const todayISO = new Date().toISOString().slice(0,10);
     const jan1ISO = todayISO.slice(0,4) + '-01-01';
-    const totals = sites.map(s => sumRain((S.pluvioData[s.key]||{jours:{}}).jours, jan1ISO, todayISO));
-    const moyenne = totals.reduce((a,b)=>a+b, 0) / totals.length;
-    el.textContent = moyenne.toFixed(0);
+    const total = sumRain((S.pluvioData[site.key]||{jours:{}}).jours, jan1ISO, todayISO);
+    el.textContent = total.toFixed(0);
   });
 }
 
