@@ -258,11 +258,11 @@ tr:hover td{background:var(--vert-xxl);}
       <h2>🌧️ Pluviometrie</h2>
       <a href="javascript:void(0)" onclick="showPage('dashboard')" style="font-size:13px;color:var(--vert);font-weight:600;">← Tableau de bord</a>
     </div>
-    <div id="pluvio-page-controls" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"></div>
+    <div id="pluvio-page-controls" class="campagne-bar"></div>
     <div class="card">
       <div id="pluvio-page-stats" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;"></div>
       <div style="display:flex;gap:6px;margin-bottom:10px;">
-        <div class="tab active" id="pvtab-quotidien" onclick="setPluvioPageView('quotidien')" style="border-radius:50px;padding:8px 16px;">Quotidien</div>
+        <div class="tab active" id="pvtab-mensuel" onclick="setPluvioPageView('mensuel')" style="border-radius:50px;padding:8px 16px;">Mensuel</div>
         <div class="tab" id="pvtab-cumule" onclick="setPluvioPageView('cumule')" style="border-radius:50px;padding:8px 16px;">Cumule</div>
       </div>
       <div id="pluvio-page-chart"></div>
@@ -532,7 +532,7 @@ const S = {
   datesRecolte: {},
   recoltesConfirmees: {},
   baseMeta: {}, // contenu du document bases/{type} lui-meme (ex: derniereRecalculConsommation)
-  pluvioPage: { siteKey: null, year: null, view: 'quotidien', cache: null } // etat de la page Pluviometrie detaillee
+  pluvioPage: { siteKey: null, year: null, view: 'mensuel', mois: null, cache: null } // etat de la page Pluviometrie detaillee
 };
 
 // ── CHEMINS FIRESTORE ────────────────────────────────────────
@@ -1788,6 +1788,7 @@ function renderPluvioPage() {
     S.pluvioPage.siteKey = getPluvioStationKey(); // reprend la meme preference que le pave du tableau de bord
   }
   if (!S.pluvioPage.year) S.pluvioPage.year = String(new Date().getFullYear());
+  S.pluvioPage.mois = null; // on revient toujours sur la vue annuelle a l'ouverture de la page
 
   const currentYear = new Date().getFullYear();
   const yearOptions = [];
@@ -1795,10 +1796,10 @@ function renderPluvioPage() {
 
   controls.innerHTML =
     (sites.length > 1 ?
-      '<select id="pv-site-sel" onchange="onPluvioPageSiteChange()">' +
+      '<select id="pv-site-sel" onchange="onPluvioPageSiteChange()" style="border:1px solid var(--gris-m);border-radius:var(--r-sm);padding:9px 14px;font-size:14px;color:var(--vert);font-weight:600;background:var(--blanc);cursor:pointer;">' +
         sites.map(s => '<option value="' + s.key + '"' + (s.key === S.pluvioPage.siteKey ? ' selected' : '') + '>' + esc(s.label) + '</option>').join('') +
       '</select>' : '') +
-    '<select id="pv-year-sel" onchange="onPluvioPageYearChange()">' +
+    '<select id="pv-year-sel" onchange="onPluvioPageYearChange()" style="border:1px solid var(--gris-m);border-radius:var(--r-sm);padding:9px 14px;font-size:14px;color:var(--vert);font-weight:600;background:var(--blanc);cursor:pointer;">' +
       yearOptions.map(y => '<option value="' + y + '"' + (y === S.pluvioPage.year ? ' selected' : '') + '>' + y + '</option>').join('') +
     '</select>';
 
@@ -1842,10 +1843,23 @@ window.onPluvioPageYearChange = function() {
 };
 window.setPluvioPageView = function(view) {
   S.pluvioPage.view = view;
-  document.getElementById('pvtab-quotidien').classList.toggle('active', view === 'quotidien');
+  S.pluvioPage.mois = null; // repart sur la vue annuelle a chaque changement d'onglet
+  document.getElementById('pvtab-mensuel').classList.toggle('active', view === 'mensuel');
   document.getElementById('pvtab-cumule').classList.toggle('active', view === 'cumule');
   const c = S.pluvioPage.cache;
   if (c) drawPluvioPageChart(c.jours, c.joursPrec, c.year); // redessine sans requete Firestore, les donnees sont deja en memoire
+};
+
+// Bascule vers le detail quotidien d'un mois (clic sur une barre mensuelle), et retour a la vue annuelle
+window.drillPluvioMonth = function(mois) {
+  S.pluvioPage.mois = mois;
+  const c = S.pluvioPage.cache;
+  if (c) drawPluvioPageChart(c.jours, c.joursPrec, c.year);
+};
+window.pluvioRetourAnnee = function() {
+  S.pluvioPage.mois = null;
+  const c = S.pluvioPage.cache;
+  if (c) drawPluvioPageChart(c.jours, c.joursPrec, c.year);
 };
 
 function renderPluvioPageStats(jours, joursPrec, year) {
@@ -1886,8 +1900,12 @@ function renderPluvioPageStats(jours, joursPrec, year) {
 
 function drawPluvioPageChart(jours, joursPrec, year) {
   const chartEl = document.getElementById('pluvio-page-chart');
-  if (S.pluvioPage.view === 'quotidien') drawPluvioBars(chartEl, jours, year);
-  else drawPluvioCumule(chartEl, jours, joursPrec, year);
+  if (S.pluvioPage.view === 'mensuel') {
+    if (S.pluvioPage.mois) drawPluvioJourMois(chartEl, jours, year, S.pluvioPage.mois);
+    else drawPluvioMensuel(chartEl, jours, year);
+  } else {
+    drawPluvioCumule(chartEl, jours, joursPrec, year);
+  }
 }
 
 function joursAnnee(year, endISO) {
@@ -1899,39 +1917,77 @@ function joursAnnee(year, endISO) {
   return dates;
 }
 
-// Barres quotidiennes (une par jour, largeur fixe, conteneur scrollable horizontalement —
-// plus lisible sur mobile qu'un graphique tasse sur la largeur d'un ecran).
-function drawPluvioBars(chartEl, jours, year) {
+// Dernier jour du mois "mois" (1-12) d'une annee donnee, au format ISO.
+function dernierJourMoisISO(year, mois) {
+  const d = new Date(parseInt(year, 10), mois, 0); // jour 0 du mois suivant = dernier jour du mois vise
+  const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+  return y + '-' + m + '-' + day;
+}
+
+const NOMS_MOIS = ['Janvier', 'Fevrier', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Aout', 'Septembre', 'Octobre', 'Novembre', 'Decembre'];
+
+// Vue par defaut : un total par mois sur toute l'annee, tient sur un ecran de telephone sans defilement.
+// Cliquer sur un mois bascule sur le detail quotidien de ce mois (drawPluvioJourMois).
+function drawPluvioMensuel(chartEl, jours, year) {
   const isCurrentYear = year === String(new Date().getFullYear());
   const todayISO = new Date().toISOString().slice(0, 10);
-  const endISO = isCurrentYear ? todayISO : (year + '-12-31');
-  const dates = joursAnnee(year, endISO);
+  const dernierMois = isCurrentYear ? (parseInt(todayISO.slice(5, 7), 10)) : 12;
+  const totaux = [];
+  for (let m = 1; m <= dernierMois; m++) {
+    const startISO = year + '-' + String(m).padStart(2, '0') + '-01';
+    let endISO = dernierJourMoisISO(year, m);
+    if (isCurrentYear && m === dernierMois && todayISO < endISO) endISO = todayISO;
+    totaux.push(sumRain(jours, startISO, endISO));
+  }
+  const max = Math.max(1, ...totaux);
+  const bars = totaux.map((v, i) => {
+    const m = i + 1;
+    const h = v > 0 ? Math.max(3, Math.round((v / max) * 100)) : 0;
+    return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;cursor:pointer;min-width:0;" onclick="drillPluvioMonth(' + m + ')">' +
+      '<div style="font-size:10px;color:var(--vert);font-weight:600;">' + v.toFixed(0) + '</div>' +
+      '<div style="width:100%;height:110px;display:flex;align-items:flex-end;justify-content:center;padding:0 2px;"><div style="width:70%;height:' + h + '%;background:var(--vert-l);border-radius:3px 3px 0 0;"></div></div>' +
+      '<div style="font-size:10px;color:var(--gris);margin-top:4px;">' + NOMS_MOIS[i].slice(0, 3) + '</div>' +
+    '</div>';
+  }).join('');
+  chartEl.innerHTML =
+    '<div style="font-size:11px;color:var(--gris);margin-bottom:6px;">Toucher un mois pour le detail quotidien</div>' +
+    '<div style="display:flex;align-items:flex-end;gap:2px;">' + bars + '</div>';
+}
+
+// Detail quotidien d'un seul mois (declenche par un clic sur une barre mensuelle) : le nombre
+// de barres reste faible (<=31), donc tient sur la largeur de l'ecran sans defilement.
+function drawPluvioJourMois(chartEl, jours, year, mois) {
+  const isCurrentYear = year === String(new Date().getFullYear());
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const startISO = year + '-' + String(mois).padStart(2, '0') + '-01';
+  let endISO = dernierJourMoisISO(year, mois);
+  const isMoisEnCours = isCurrentYear && parseInt(todayISO.slice(5, 7), 10) === mois;
+  if (isMoisEnCours && todayISO < endISO) endISO = todayISO;
+  const dates = [];
+  let d = new Date(startISO + 'T00:00:00');
+  const end = new Date(endISO + 'T00:00:00');
+  while (d <= end) { dates.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 1); }
   const values = dates.map(iso => jours[iso] || 0);
   const max = Math.max(1, ...values);
-  const barW = 4;
   const bars = dates.map((iso, i) => {
     const v = values[i];
-    const h = v > 0 ? Math.max(2, Math.round((v / max) * 100)) : 0;
-    return '<div style="flex:0 0 ' + barW + 'px;width:' + barW + 'px;height:100px;display:flex;align-items:flex-end;" title="' + iso + ' : ' + v.toFixed(1) + ' mm">' +
-      '<div style="width:100%;height:' + h + '%;background:var(--vert-l);border-radius:1px 1px 0 0;"></div></div>';
+    const h = v > 0 ? Math.max(3, Math.round((v / max) * 100)) : 0;
+    return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;min-width:0;" title="' + iso + ' : ' + v.toFixed(1) + ' mm">' +
+      '<div style="width:100%;height:100px;display:flex;align-items:flex-end;justify-content:center;"><div style="width:60%;height:' + h + '%;background:var(--vert-l);border-radius:2px 2px 0 0;"></div></div>' +
+      '<div style="font-size:9px;color:var(--gris);margin-top:2px;">' + parseInt(iso.slice(8, 10), 10) + '</div>' +
+    '</div>';
   }).join('');
-  let monthLabels = '';
-  for (let m = 1; m <= 12; m++) {
-    const mISO = year + '-' + String(m).padStart(2, '0') + '-01';
-    const idx = dates.indexOf(mISO);
-    if (idx === -1) continue;
-    monthLabels += '<span style="position:absolute;left:' + (idx * barW) + 'px;font-size:10px;color:var(--gris);">' + ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aou', 'Sep', 'Oct', 'Nov', 'Dec'][m - 1] + '</span>';
-  }
   chartEl.innerHTML =
-    '<div style="overflow-x:auto;"><div style="min-width:' + (dates.length * barW) + 'px;">' +
-      '<div style="display:flex;align-items:flex-end;height:100px;">' + bars + '</div>' +
-      '<div style="position:relative;height:16px;margin-top:4px;">' + monthLabels + '</div>' +
-    '</div></div>';
+    '<div style="margin-bottom:8px;"><a href="javascript:void(0)" onclick="pluvioRetourAnnee()" style="font-size:12px;color:var(--vert);font-weight:600;">← Annee</a> <span style="font-size:13px;font-weight:700;margin-left:8px;">' + NOMS_MOIS[mois - 1] + ' ' + year + '</span></div>' +
+    '<div style="display:flex;align-items:flex-end;gap:1px;">' + bars + '</div>';
 }
 
 // Courbe cumulee (SVG, sans dependance externe) : annee selectionnee en trait plein,
 // annee precedente en pointille sur la meme periode calendaire, pour visualiser un
 // deficit/exces hydrique par rapport a l'annee passee (a defaut d'une normale sur 30 ans, non disponible).
+// Reperes ordonnee (mm, a gauche) et abscisse (mois, en dessous) ajoutes en HTML a cote du SVG
+// plutot que dans le SVG lui-meme, pour eviter toute deformation du texte due au stretch horizontal
+// (viewBox etire en largeur variable via preserveAspectRatio="none").
 function drawPluvioCumule(chartEl, jours, joursPrec, year) {
   const isCurrentYear = year === String(new Date().getFullYear());
   const todayISO = new Date().toISOString().slice(0, 10);
@@ -1963,16 +2019,37 @@ function drawPluvioCumule(chartEl, jours, joursPrec, year) {
   }).join(' ');
 
   const svg =
-    '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:150px;" preserveAspectRatio="none">' +
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:150px;display:block;" preserveAspectRatio="none">' +
     (cumPrecValues ? '<polyline points="' + toPoints(cumPrecValues) + '" fill="none" stroke="var(--gris-m)" stroke-width="2" stroke-dasharray="4,3"/>' : '') +
     '<polyline points="' + toPoints(cumValues) + '" fill="none" stroke="var(--vert)" stroke-width="2.5"/>' +
     '</svg>';
+
+  // Reperes ordonnee : 5 paliers repartis entre 0 et le maximum affiche
+  const yTicks = [1, 0.75, 0.5, 0.25, 0].map(f => Math.round(maxVal * f));
+  const yLabels = '<div style="display:flex;flex-direction:column;justify-content:space-between;height:150px;font-size:10px;color:var(--gris);padding-right:6px;text-align:right;">' +
+    yTicks.map(v => '<span>' + v + '</span>').join('') + '</div>';
+
+  // Reperes abscisse : un repere par mois, positionne en % de la largeur totale (proportionnel au nombre de jours)
+  let xLabels = '';
+  for (let m = 1; m <= 12; m++) {
+    const mISO = year + '-' + String(m).padStart(2, '0') + '-01';
+    const idx = dates.indexOf(mISO);
+    if (idx === -1) continue;
+    const pct = n > 1 ? (idx / (n - 1)) * 100 : 0;
+    xLabels += '<span style="position:absolute;left:' + pct.toFixed(1) + '%;font-size:10px;color:var(--gris);">' + ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'][m - 1] + '</span>';
+  }
+
   const legend =
     '<div style="display:flex;gap:14px;font-size:11px;color:var(--gris);margin-top:6px;">' +
       '<span>— ' + year + '</span>' +
       (cumPrecValues ? '<span>┄ ' + (parseInt(year, 10) - 1) + '</span>' : '') +
     '</div>';
-  chartEl.innerHTML = svg + legend;
+
+  chartEl.innerHTML =
+    '<div style="display:flex;gap:4px;">' +
+      yLabels +
+      '<div style="flex:1;min-width:0;">' + svg + '<div style="position:relative;height:14px;margin-top:2px;">' + xLabels + '</div></div>' +
+    '</div>' + legend;
 }
 
 window.selectAllParcelles = function(checked) {
