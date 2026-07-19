@@ -416,6 +416,7 @@ tr:hover td{background:var(--vert-xxl);}
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, getDocs, getDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { fmtDate, toISO, addDaysToDate, esc, normText, toast, loading, confirm2 } from "./js/utils.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyARkXeCqBH2lSbfG_YsTuMJfY6NtUrwosg",
@@ -544,35 +545,8 @@ const baseDoc = (type, name, id) => doc(db, 'bases', type, name, id);
 const backupsCol = () => collection(db, 'backups');
 
 // ── UTILS ────────────────────────────────────────────────────
-function fmtDate(v) {
-  if (!v) return '';
-  if (v.includes('-')) {
-    const [y,m,d] = v.split('-');
-    return d + '/' + m + '/' + String(y).slice(-2);
-  }
-  return v;
-}
-// Ajoute un nombre de jours a une date stockee au format DD/MM/YY (ou ISO), retourne au format DD/MM/YY
-function addDaysToDate(dateStr, days) {
-  const iso = toISO(dateStr);
-  if (!iso) return '';
-  const d = new Date(iso + 'T00:00:00');
-  if (Number.isNaN(d.getTime())) return '';
-  d.setDate(d.getDate() + (parseInt(days, 10) || 0));
-  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,'0'), day = String(d.getDate()).padStart(2,'0');
-  return fmtDate(y + '-' + m + '-' + day);
-}
-function toISO(v) {
-  if (!v) return '';
-  if (v.includes('/')) {
-    const p = v.split('/');
-    if (p.length === 3) {
-      const y = p[2].length === 2 ? '20' + p[2] : p[2];
-      return y + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
-    }
-  }
-  return v;
-}
+// fmtDate, toISO, addDaysToDate, esc, normText, toast, loading, confirm2
+// extraits vers js/utils.js le 19/07/2026 (etape 1 de la modularisation).
 function yearOf(p) {
   if (p.campagne) return p.campagne;
   const iso = toISO(p.date);
@@ -621,45 +595,6 @@ function calcIFT(passage) {
     total += (doseAppliquee / doseRef) * (surfaceTraitee / surfaceExploit);
   });
   return total;
-}
-
-// Echappe les caracteres HTML speciaux dans un texte libre (notes, noms...) avant insertion via innerHTML,
-// pour eviter qu'un "<" ou "&" tape par erreur ne casse l'affichage (voir "Points de vigilance").
-function esc(v) {
-  if (v === null || v === undefined) return '';
-  return String(v)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-function toast(msg, err) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = err ? 'err show' : 'show';
-  setTimeout(() => { t.className = ''; }, 2800);
-}
-function loading(v) {
-  document.getElementById('loading').className = v ? '' : 'hide';
-}
-
-// confirm dialog
-let confirmCb = null;
-window.closeConfirm = function() {
-  document.getElementById('confirm-overlay').classList.remove('open');
-  confirmCb = null;
-};
-document.getElementById('confirm-ok-btn').onclick = function() {
-  if (confirmCb) confirmCb();
-  closeConfirm();
-};
-function confirm2(title, msg, cb) {
-  document.getElementById('confirm-title').textContent = title;
-  document.getElementById('confirm-msg').textContent = msg;
-  document.getElementById('confirm-overlay').classList.add('open');
-  confirmCb = cb;
 }
 
 // ── INIT ─────────────────────────────────────────────────────
@@ -3438,10 +3373,6 @@ window.delSiteMeteo = function(id, nom) {
 // importees ECRASENT celles deja stockees pour les memes jours dans exploitations/{id}/pluviometrie
 // (source station jugee plus fiable qu'Open-Meteo) ; les jours non couverts par l'import restent
 // inchanges. Voir STRUCTURE.md.
-function normText(s) {
-  return (s || '').toString().trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-}
-
 window.openImportCsvModal = function() {
   S.csvImportParsed = null;
   const body =
