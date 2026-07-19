@@ -10,6 +10,8 @@
 // entierement (jamais `S = {...}` apres cette declaration) : verifie sur tout le fichier
 // d'origine, a respecter dans les futurs modules egalement.
 
+import { toISO } from './utils.js';
+
 export const UNITES = ['L/HA', 'KG/HA', 'L/HL'];
 
 export const STADES_VITICOLE = [
@@ -99,3 +101,57 @@ export const S = {
   baseMeta: {}, // contenu du document bases/{type} lui-meme (ex: derniereRecalculConsommation)
   pluvioPage: { siteKey: null, year: null, view: 'mensuel', mois: null, cache: null } // etat de la page Pluviometrie detaillee
 };
+
+// ── REQUETES SUR L'ETAT (aucune dependance DOM/Firestore) ────
+// yearOf, cpPassages, nextPassageNum, getEx, calcIFT extraits ici (au lieu d'un module
+// separe) le 19/07/2026, car pluviometrie.js (et les modules suivants) en ont besoin
+// et ce sont des fonctions pures sur S : leur place naturelle est avec l'etat lui-meme.
+export function yearOf(p) {
+  if (p.campagne) return p.campagne;
+  const iso = toISO(p.date);
+  return iso ? iso.slice(0,4) : String(new Date().getFullYear());
+}
+export function cpPassages() { return S.passages.filter(p => yearOf(p) === S.campagne); }
+
+// Calcule le prochain numero de passage a partir du numero MAX existant (pas du nombre de passages),
+// pour eviter un doublon si un passage a ete supprime au milieu de la sequence.
+export function nextPassageNum(kind) {
+  const liste = cpPassages().filter(x => (kind === 'engrais') ? x.type === 'engrais' : x.type !== 'engrais');
+  const maxNum = liste.reduce((max, x) => Math.max(max, x.num || 0), 0);
+  return maxNum + 1;
+}
+export function getEx() { return S.exploitations.find(e => e.id === S.currentId); }
+
+// IFT (Indice de Frequence de Traitement) d'un passage = somme, pour chaque produit hors biocontrole,
+// de (dose appliquee / dose recommandee) x (surface traitee / surface totale exploitation - methode A).
+export function calcIFT(passage) {
+  if (!passage || passage.type === 'engrais') return 0;
+  const ex = S.exploitations.find(e => e.id === S.currentId) || getEx();
+  const surfaceExploit = ex ? parseFloat(ex.surface)||0 : 0;
+  if (!surfaceExploit) return 0;
+  const ids = passage.parcellesIds || [];
+  const surfaceTraiteeBrute = (passage.parcelles||[]).reduce((sum, nomP, idx) => {
+    const idP = ids[idx];
+    const parc = (idP && S.parcelles.find(pc => pc.id === idP)) || S.parcelles.find(pc => pc.nom === nomP);
+    return sum + (parc ? parseFloat(parc.surface)||0 : 0);
+  }, 0);
+  const pct = Math.min(100, Math.max(0, parseFloat(passage.pourcentSurface) || 100)) / 100;
+  const surfaceTraitee = surfaceTraiteeBrute * pct;
+  if (!surfaceTraitee) return 0;
+  let total = 0;
+  (passage.produitsList||[]).forEach(pr => {
+    const catObj = S.categories.find(c => c.nom === pr.cat);
+    // Categorie retrouvee : on se fie au champ explicite exclureIFT.
+    // Si le champ n'a jamais ete renseigne (categorie creee avant ce champ, pas encore migree),
+    // on retombe sur l'ancienne detection par nom en filet de securite.
+    const exclu = catObj && catObj.exclureIFT !== undefined
+      ? catObj.exclureIFT
+      : (pr.cat||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes('BIOCONTROLE');
+    if (exclu) return; // exclu de l'IFT (methode IFT hors biocontrole)
+    const doseRef = pr.doseReferenceIFT;
+    if (doseRef===null || doseRef===undefined || !Number.isFinite(doseRef) || doseRef <= 0) return; // pas de dose de reference = produit hors IFT
+    const doseAppliquee = parseFloat(pr.qte) || 0;
+    total += (doseAppliquee / doseRef) * (surfaceTraitee / surfaceExploit);
+  });
+  return total;
+}
