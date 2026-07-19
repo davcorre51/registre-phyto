@@ -1,0 +1,1937 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#2d5016">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PhytoRegistre">
+<title>Registre Phytosanitaire</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='50' fill='%232d5016'/%3E%3Ctext y='.9em' font-size='60' x='18' fill='white'%3E%F0%9F%8C%BF%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  --vert:#2d5016;--vert-m:#3d6b1e;--vert-l:#5a9428;--vert-xl:#e8f3d6;--vert-xxl:#f4f9ec;
+  --ocre:#b8860b;--ocre-l:#f5e6a3;--rouge:#8b1a1a;--rouge-l:#fde8e8;
+  --bleu:#1a4a7a;--bleu-l:#e8f0fb;--gris:#4a4a4a;--gris-l:#f2f2ef;--gris-m:#d0d0c8;--blanc:#fff;
+  --ombre:0 2px 12px rgba(0,0,0,0.08);--r:10px;--r-sm:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-l);color:var(--gris);min-height:100vh;font-size:14px;}
+
+#topbar{background:var(--vert);color:white;padding:0 16px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.2);}
+#topbar h1{font-size:15px;font-weight:500;}
+#exploit-badge{background:rgba(255,255,255,0.15);border-radius:20px;padding:4px 12px;font-size:12px;cursor:pointer;border:1px solid rgba(255,255,255,0.25);transition:background .15s;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#exploit-badge:hover{background:rgba(255,255,255,0.25);}
+
+#nav{background:var(--blanc);border-bottom:1px solid var(--gris-m);display:flex;overflow-x:auto;scrollbar-width:none;position:sticky;top:56px;z-index:90;}
+#nav::-webkit-scrollbar{display:none;}
+.tab{padding:12px 14px;font-size:13px;font-weight:500;color:var(--gris);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap;transition:all .15s;user-select:none;}
+.tab:hover{color:var(--vert);}
+.tab.active{color:var(--vert);border-bottom-color:var(--vert);}
+
+#content{padding:14px;max-width:960px;margin:0 auto;}
+.page{display:none;}
+.page.active{display:block;}
+
+.card{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);padding:16px;margin-bottom:14px;}
+.card-title{font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--vert-xl);}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-group label{font-size:11px;font-weight:600;color:var(--gris);text-transform:uppercase;letter-spacing:.5px;}
+.form-group input,.form-group select,.form-group textarea{border:1px solid var(--gris-m);border-radius:var(--r-sm);padding:8px 10px;font-family:inherit;font-size:13px;color:var(--gris);background:var(--blanc);transition:border-color .15s;}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--vert-l);box-shadow:0 0 0 3px var(--vert-xl);}
+.form-group.full{grid-column:1/-1;}
+
+.btn{padding:8px 16px;border-radius:var(--r-sm);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--vert);color:white;}
+.btn-primary:hover{background:var(--vert-m);}
+.btn-secondary{background:var(--gris-l);color:var(--gris);border:1px solid var(--gris-m);}
+.btn-secondary:hover{background:var(--gris-m);}
+.btn-danger{background:var(--rouge-l);color:var(--rouge);border:1px solid #f5c6c6;}
+.btn-danger:hover{background:#fbd5d5;}
+.btn-edit{background:var(--bleu-l);color:var(--bleu);border:1px solid #b8d0f0;}
+.btn-edit:hover{background:#d0e4f8;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.btn-icon{padding:7px 10px;font-size:16px;line-height:1;background:transparent;border:1px solid var(--gris-m);border-radius:8px;color:var(--gris-m);box-shadow:none;transition:all .15s;}
+.btn-icon:hover{background:var(--gris-l);border-color:var(--gris);color:var(--gris);}
+.btn-icon.del:hover{background:var(--rouge-l);border-color:#f5c6c6;color:var(--rouge);}
+.btn-icon.edt:hover{background:var(--bleu-l);border-color:#b8d0f0;color:var(--bleu);}
+
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.badge-vert{background:var(--vert-xl);color:var(--vert);}
+.badge-ocre{background:var(--ocre-l);color:var(--ocre);}
+.badge-rouge{background:var(--rouge-l);color:var(--rouge);}
+.badge-bleu{background:var(--bleu-l);color:var(--bleu);}
+.badge-gris{background:var(--gris-l);color:var(--gris);}
+
+.table-wrap{overflow-x:auto;border-radius:var(--r-sm);border:1px solid var(--gris-m);}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{background:var(--vert-xxl);color:var(--vert);font-weight:700;padding:8px 10px;text-align:left;border-bottom:2px solid var(--vert-xl);white-space:nowrap;font-size:11px;text-transform:uppercase;letter-spacing:.5px;}
+td{padding:8px 10px;border-bottom:1px solid var(--gris-l);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--vert-xxl);}
+.td-actions{display:flex;gap:4px;justify-content:flex-end;}
+
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;}
+.stat-card{background:var(--blanc);border-radius:var(--r);padding:12px 14px;box-shadow:var(--ombre);border-left:4px solid var(--vert-l);}
+.stat-card.ocre{border-left-color:var(--ocre);}
+.stat-card.rouge{border-left-color:var(--rouge);}
+.stat-card.bleu{border-left-color:var(--bleu);}
+.stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--gris);margin-bottom:4px;}
+.stat-val{font-size:22px;font-weight:300;color:var(--vert);}
+.stat-card.ocre .stat-val{color:var(--ocre);}
+.stat-card.rouge .stat-val{color:var(--rouge);}
+.stat-card.bleu .stat-val{color:var(--bleu);}
+.stat-unit{font-size:11px;color:var(--gris);margin-top:2px;}
+
+.passage-item{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);margin-bottom:10px;overflow:hidden;}
+.passage-header{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;background:var(--vert-xxl);user-select:none;}
+.passage-num{background:var(--vert);color:white;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.passage-date{font-size:13px;font-weight:600;color:var(--vert);}
+.passage-meta{font-size:11px;color:var(--gris);margin-top:2px;}
+.passage-right{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px;}
+.passage-body{padding:14px 16px;border-top:1px solid var(--vert-xl);display:none;}
+.passage-body.open{display:block;}
+.prod-cat-title{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--vert);margin:8px 0 4px;letter-spacing:.5px;}
+.prod-line{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--gris-l);font-size:12px;}
+.prod-line:last-child{border-bottom:none;}
+
+.produits-cat-section{margin-bottom:16px;}
+.produits-cat-header{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--vert-xxl);border-radius:var(--r-sm);margin-bottom:6px;cursor:pointer;}
+.produits-cat-name{font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.5px;}
+
+.parcelle-list{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);overflow:hidden;}
+.parcelle-section-title{text-align:center;padding:16px 20px 14px;border-bottom:2px solid var(--vert-xl);}
+.parcelle-section-title .pst-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--gris);opacity:.5;margin-bottom:6px;}
+.parcelle-section-title .pst-stats{display:flex;align-items:center;justify-content:center;gap:0;}
+.parcelle-section-title .pst-stat{padding:0 18px;text-align:center;}
+.parcelle-section-title .pst-stat-val{font-size:22px;font-weight:300;color:var(--vert);line-height:1.1;}
+.parcelle-section-title .pst-stat-lbl{font-size:11px;color:var(--gris);opacity:.6;margin-top:2px;}
+.parcelle-section-title .pst-sep{width:1px;height:32px;background:var(--gris-m);opacity:.5;}
+.parcelle-item{display:flex;align-items:center;justify-content:space-between;padding:16px 16px;border-bottom:1px solid var(--gris-l);gap:12px;}
+.parcelle-item:last-child{border-bottom:none;}
+.parcelle-left{flex:1;min-width:0;}
+.parcelle-nom{font-weight:700;color:#1a1a1a;font-size:15px;margin-bottom:4px;}
+.parcelle-info{font-size:12px;color:#888;line-height:1.4;}
+.parcelle-actions{display:flex;gap:8px;flex-shrink:0;}
+
+.exploit-card{background:var(--blanc);border-radius:var(--r);box-shadow:var(--ombre);padding:16px;margin-bottom:10px;border-left:4px solid var(--gris-m);}
+.exploit-card.active-exploit{border-left-color:var(--vert-l);}
+.exploit-nom{font-size:15px;font-weight:700;color:var(--vert);}
+.exploit-siret{font-size:11px;color:var(--gris);margin-top:2px;font-family:monospace;}
+.exploit-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+
+#modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;}
+#modal-overlay.open{display:flex;}
+#modal{background:var(--blanc);border-radius:var(--r);box-shadow:0 8px 40px rgba(0,0,0,0.2);width:100%;max-width:660px;max-height:90vh;overflow-y:auto;}
+#modal-header{padding:16px 20px;border-bottom:1px solid var(--gris-m);display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;background:var(--blanc);z-index:1;}
+#modal-title{font-size:15px;font-weight:700;color:var(--vert);}
+#modal-body{padding:20px;}
+#modal-footer{padding:14px 20px;border-top:1px solid var(--gris-l);display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:var(--blanc);}
+.btn-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--gris);line-height:1;padding:0 4px;}
+
+#confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:none;align-items:center;justify-content:center;padding:20px;}
+#confirm-overlay.open{display:flex;}
+#confirm-box{background:white;border-radius:var(--r);padding:24px;max-width:340px;width:100%;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,0.25);}
+#confirm-box h3{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--rouge);}
+#confirm-box p{font-size:13px;color:var(--gris);margin-bottom:20px;line-height:1.5;}
+.btn-row{display:flex;gap:8px;justify-content:center;}
+
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--vert);color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:400;transition:transform .3s;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.2);}
+#toast.show{transform:translateX(-50%) translateY(0);}
+#toast.err{background:var(--rouge);}
+
+#loading{position:fixed;inset:0;background:var(--vert);display:flex;flex-direction:column;align-items:center;justify-content:center;color:white;z-index:500;}
+#loading.hide{display:none;}
+.spinner{width:40px;height:40px;border:3px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin .8s linear infinite;margin-bottom:16px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.bar-bg{height:6px;background:var(--gris-l);border-radius:3px;overflow:hidden;margin-top:4px;}
+.bar-fill{height:100%;border-radius:3px;transition:width .5s;}
+
+.section-title{font-size:12px;font-weight:700;color:var(--vert);margin:16px 0 10px;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.5px;}
+.section-title::after{content:'';flex:1;height:1px;background:var(--vert-xl);}
+
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.page-header h2{font-size:16px;font-weight:700;color:var(--vert);}
+
+.empty{text-align:center;padding:40px 20px;color:var(--gris);}
+.empty-icon{font-size:36px;margin-bottom:10px;opacity:.4;}
+.empty-text{font-size:13px;opacity:.6;}
+
+.campagne-bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;background:var(--blanc);padding:10px 14px;border-radius:var(--r);box-shadow:var(--ombre);flex-wrap:wrap;}
+.campagne-bar label{font-size:12px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.5px;}
+.campagne-bar select{border:1px solid var(--gris-m);border-radius:var(--r-sm);padding:6px 10px;font-size:13px;color:var(--vert);font-weight:600;background:var(--blanc);}
+
+.prod-pills-section{margin-bottom:14px;}
+.prod-pills-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--vert);margin-bottom:8px;}
+.prod-pills-grid{display:flex;flex-wrap:wrap;gap:8px;}
+.prod-pill{display:flex;align-items:center;gap:0;border-radius:50px;border:2px solid var(--gris-m);background:var(--blanc);overflow:hidden;transition:all .15s;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.06);}
+.prod-pill.active{border-color:var(--vert);background:var(--vert-xl);box-shadow:0 2px 8px rgba(45,80,22,0.2);}
+.prod-pill-name{padding:8px 14px;font-size:13px;font-weight:500;color:var(--gris);user-select:none;}
+.prod-pill.active .prod-pill-name{color:var(--vert);font-weight:700;}
+.prod-pill-dose{display:none;padding:5px 8px;background:var(--vert-xl);border-left:1.5px solid var(--vert-l);align-items:center;gap:4px;}
+.prod-pill.active .prod-pill-dose{display:flex;}
+.pill-qte{border:none;background:transparent;font-size:12px;color:var(--vert);font-weight:600;width:55px;outline:none;font-family:inherit;}
+.pill-unite{border:none;background:transparent;font-size:11px;color:var(--vert);font-weight:600;outline:none;font-family:inherit;cursor:pointer;padding:0;}
+
+.stades-row{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px;margin-bottom:8px;scrollbar-width:none;}
+.stade-pill{background:var(--vert-xxl);border:1px solid var(--vert-xl);border-radius:20px;padding:3px 10px;font-size:11px;white-space:nowrap;color:var(--vert);font-weight:500;cursor:pointer;}
+.stade-pill:hover{background:var(--vert-xl);}
+
+@media(max-width:600px){
+  .form-grid{grid-template-columns:1fr;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+  #content{padding:10px;}
+  .tab{padding:10px 12px;font-size:12px;}
+  .parcelle-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  <div style="font-size:14px;opacity:.8;">Chargement...</div>
+</div>
+
+<div id="topbar">
+  <div>
+    <div style="font-size:10px;opacity:.6;text-transform:uppercase;letter-spacing:1px;">🌿 PhytoRegistre</div>
+    <h1 style="font-size:14px;font-weight:500;">Registre Phytosanitaire</h1>
+  </div>
+  <select id="exploit-select" onchange="switchExploit(this.value)" style="background:var(--vert-m);border:1px solid rgba(255,255,255,0.4);color:white;border-radius:20px;padding:6px 12px;font-size:12px;font-family:inherit;max-width:170px;cursor:pointer;outline:none;-webkit-appearance:none;appearance:none;"></select>
+</div>
+
+<div id="nav">
+  <div class="tab active" onclick="showPage('dashboard')">Tableau de bord</div>
+  <div class="tab" onclick="showPage('passages')">Passages</div>
+  <div class="tab" onclick="showPage('produits')">Produits</div>
+  <div class="tab" onclick="showPage('exploitations')">Exploitations</div>
+  <div class="tab" onclick="showPage('export')">Export</div>
+</div>
+
+<div id="campagne-global-bar" style="background:var(--blanc);border-bottom:1px solid var(--gris-m);padding:8px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;position:sticky;top:97px;z-index:80;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+  <span style="font-size:11px;font-weight:700;color:var(--gris);text-transform:uppercase;letter-spacing:.5px;">Campagne</span>
+  <select id="campagne-select" onchange="onCampagneChange()" style="border:1px solid var(--gris-m);border-radius:var(--r-sm);padding:6px 10px;font-size:13px;color:var(--vert);font-weight:700;background:var(--blanc);cursor:pointer;"></select>
+  <button class="btn btn-secondary btn-sm" onclick="newCampagne()">+ Nouvelle</button>
+  <span id="camp-info" style="font-size:12px;color:var(--gris);margin-left:4px;"></span>
+</div>
+<div id="content">
+
+  <!-- DASHBOARD -->
+  <div id="page-dashboard" class="page active">
+
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Passages</div><div class="stat-val" id="stat-passages">0</div><div class="stat-unit">enregistres</div></div>
+
+      <div class="stat-card" style="border-color:var(--vert);"><div class="stat-label">IFT Total</div><div class="stat-val" id="stat-ift">0</div><div class="stat-unit">campagne en cours (hors biocontrole)</div></div>
+
+      <div class="stat-card rouge" id="pluvio-stat-card" onclick="cyclePluvioStation()"><div class="stat-label">Pluviometrie</div><div class="stat-val" id="stat-pluvio">-</div><div class="stat-unit">mm depuis le 1er janvier</div><div id="stat-pluvio-site" style="font-size:12px;color:var(--gris);margin-top:2px;"></div></div>
+    </div>
+
+    <div class="card" id="rainfall-card" style="display:none;">
+      <div class="card-title">🌧️ Pluviometrie depuis le dernier traitement</div>
+      <div id="rainfall-content"></div>
+      <div style="margin-top:8px;text-align:right;"><a href="javascript:void(0)" onclick="showPage('pluviometrie')" style="font-size:12px;color:var(--vert);font-weight:600;">Voir le detail →</a></div>
+    </div>
+
+    <div class="card" id="dar-summary-card" style="display:none;">
+      <div class="card-title">⏳ Delai avant recolte (DAR)</div>
+      <div id="dar-summary-content"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Derniers passages</div>
+      <div id="dash-passages"></div>
+      <button class="btn btn-primary" style="margin-top:12px;" onclick="openPassageModal(null)">+ Nouveau passage</button>
+    </div>
+  </div>
+
+  <!-- PLUVIOMETRIE (page detaillee) -->
+  <div id="page-pluviometrie" class="page">
+    <div class="page-header">
+      <h2>🌧️ Pluviometrie</h2>
+      <a href="javascript:void(0)" onclick="showPage('dashboard')" style="font-size:13px;color:var(--vert);font-weight:600;">← Tableau de bord</a>
+    </div>
+    <div id="pluvio-page-controls" class="campagne-bar"></div>
+    <div class="card">
+      <div id="pluvio-page-stats" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;"></div>
+      <div style="display:flex;gap:6px;margin-bottom:18px;">
+        <div class="tab active" id="pvtab-mensuel" onclick="setPluvioPageView('mensuel')" style="border-radius:50px;padding:8px 16px;">Mensuel</div>
+        <div class="tab" id="pvtab-cumule" onclick="setPluvioPageView('cumule')" style="border-radius:50px;padding:8px 16px;">Cumule</div>
+      </div>
+      <div id="pluvio-page-chart"></div>
+    </div>
+  </div>
+
+  <!-- PASSAGES -->
+  <div id="page-passages" class="page">
+    <div class="page-header">
+      <h2>Passages</h2>
+      <div style="display:flex;gap:8px;" id="passages-actions"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <div class="tab active" id="psubtab-phyto" onclick="showPassagesView('phyto')" style="border-radius:50px;padding:8px 16px;">Phyto</div>
+      <div class="tab" id="psubtab-engrais" onclick="showPassagesView('engrais')" style="border-radius:50px;padding:8px 16px;">Engrais</div>
+    </div>
+    <div id="passages-list"></div>
+  </div>
+
+  <!-- PRODUITS -->
+  <div id="page-produits" class="page">
+    <div class="page-header">
+      <h2>Base de produits</h2>
+      <div style="display:flex;gap:8px;" id="produits-actions"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:14px;">
+      <div class="tab active" id="subtab-phyto" onclick="showProduitsView('phyto')" style="border-radius:50px;padding:8px 16px;">Produits phyto</div>
+      <div class="tab" id="subtab-engrais" onclick="showProduitsView('engrais')" style="border-radius:50px;padding:8px 16px;">Engrais</div>
+    </div>
+    <div class="form-group" id="produits-search-wrap" style="max-width:320px;margin-bottom:12px;">
+      <input type="text" id="produits-search" placeholder="🔎 Rechercher un produit..." oninput="filtreProduits(this.value)">
+    </div>
+    <div id="produits-liens-externes" style="display:flex;gap:8px;margin:-6px 0 12px;">
+      <a class="btn btn-secondary btn-sm" href="https://ephy.anses.fr/" target="_blank" rel="noopener">🔎 E-Phy (ANSES)</a>
+      <a class="btn btn-secondary btn-sm" href="https://ecoagri.agriculture.gouv.fr/ift/doses-reference/2026" target="_blank" rel="noopener">📊 Doses IFT 2026</a>
+      <button class="btn btn-secondary btn-sm" onclick="openStockRapide()">📦 Stock rapide</button>
+    </div>
+    <div id="produits-sections"></div>
+    <div id="engrais-sections" style="display:none;"></div>
+  </div>
+
+  <!-- STOCK -->
+  <div id="page-stock" class="page">
+    <div class="page-header">
+      <h2>📦 Stock</h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="ouvrirChoixAchat()">+ Ajouter un achat</button>
+        <button class="btn btn-secondary btn-sm" id="stock-export-btn" style="display:none;" onclick="exportStockPdf()">🖨️ Export PDF</button>
+        <button class="btn btn-secondary btn-sm" title="A utiliser si les stocks affiches semblent incorrects (recalcule depuis l'historique complet des passages)" onclick="recalculerConsommation()">🔄 Recalculer</button>
+      </div>
+    </div>
+    <div class="form-group" style="max-width:320px;margin-bottom:4px;">
+      <input type="text" id="stock-search" placeholder="🔎 Rechercher un produit..." oninput="filtreStock(this.value)">
+    </div>
+    <div id="stock-recalc-info" style="font-size:11px;color:var(--gris);margin-bottom:10px;"></div>
+    <div id="stock-page-content" style="font-size:13px;color:var(--gris);">Calcul en cours...</div>
+  </div>
+
+  <!-- PARCELLES -->
+  <div id="page-parcelles" class="page">
+    <div class="page-header">
+      <h2>Parcelles <span style="font-size:12px;color:var(--gris);font-weight:400;">— exploitation active</span></h2>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="showPage('exploitations')">← Retour aux exploitations</button>
+        <button class="btn btn-primary btn-sm" onclick="openParcelleModal(null)">+ Ajouter</button>
+      </div>
+    </div>
+    <div class="parcelle-list" id="parcelles-list"></div>
+  </div>
+
+  <!-- EXPLOITATIONS -->
+  <div id="page-exploitations" class="page">
+    <div class="page-header">
+      <h2>Mes exploitations</h2>
+      <button class="btn btn-primary btn-sm" onclick="openExploitModal(null)">+ Nouvelle</button>
+    </div>
+    <div id="exploit-list"></div>
+  </div>
+
+  <!-- EXPORT -->
+  <div id="page-export" class="page">
+    <div class="card">
+      <div class="card-title">Export Excel - Programme previsionnel</div>
+      <div class="form-grid" style="margin-bottom:14px;">
+        <div class="form-group">
+          <label>Campagne a exporter</label>
+          <select id="export-campagne" onchange="onExportCampagneChange()" style="border:1px solid var(--gris-m);border-radius:var(--r-sm);padding:8px 10px;font-size:13px;color:var(--vert);font-weight:700;background:var(--blanc);"></select>
+        </div>
+        <div class="form-group" id="recolte-group">
+          <label>Date de recolte (prevue ou definitive)</label>
+          <input type="date" id="export-recolte" onchange="saveExportRecolte(this.value)">
+          <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:400;font-size:12px;">
+            <input type="checkbox" id="export-recolte-confirmee" onchange="saveExportRecolteConfirmee(this.checked)"> Date confirmee (recolte realisee)
+          </label>
+        </div>
+      </div>
+      <div id="export-resume" style="background:var(--vert-xxl);border-radius:var(--r-sm);padding:10px 14px;margin-bottom:14px;font-size:13px;color:var(--vert);"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="exportExcel()">Telecharger Excel</button>
+        <button class="btn btn-secondary" onclick="exportCSV()">CSV reglementaire</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Sauvegarde de secours</div>
+      <div style="font-size:13px;color:var(--gris-d);margin-bottom:12px;">Telecharge une copie brute et complete de toutes les donnees (exploitations, passages, parcelles, produits...) au format JSON. A faire avant toute manipulation importante.</div>
+      <button class="btn btn-secondary" onclick="exportSauvegardeJSON()">Telecharger la sauvegarde complete (JSON)</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Mentions reglementaires 2026</div>
+      <table>
+        <tr><td style="font-weight:600;color:var(--vert);padding:6px 10px;white-space:nowrap;">Arrete applicable</td><td style="padding:6px 10px;">24 decembre 2025</td></tr>
+        <tr><td style="font-weight:600;color:var(--vert);padding:6px 10px;">Format numerique obligatoire</td><td style="padding:6px 10px;">A partir du 1er janvier 2027</td></tr>
+        <tr><td style="font-weight:600;color:var(--vert);padding:6px 10px;">Conservation</td><td style="padding:6px 10px;">5 ans minimum</td></tr>
+        <tr><td style="font-weight:600;color:var(--vert);padding:6px 10px;">Nouvelles mentions</td><td style="padding:6px 10px;">N SIRET, N AMM, label AB, horaires, stade BBCH</td></tr>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay" onclick="if(event.target===this)closeModal()">
+  <div id="modal">
+    <div id="modal-header">
+      <div id="modal-title">Modal</div>
+      <button class="btn-close" onclick="closeModal()">x</button>
+    </div>
+    <div id="modal-body"></div>
+    <div id="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-primary" id="modal-save-btn">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM -->
+<div id="confirm-overlay">
+  <div id="confirm-box">
+    <h3 id="confirm-title">Confirmer</h3>
+    <p id="confirm-msg">Cette action est irreversible.</p>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="closeConfirm()">Annuler</button>
+      <button class="btn btn-danger" id="confirm-ok-btn">Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script type="module">
+import { doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp, getDocs, getDoc, increment } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { fmtDate, toISO, addDaysToDate, esc, normText, toast, loading, confirm2 } from "./js/utils.js";
+import { S, UNITES, STADES_VITICOLE, CULTURES_AGRICOLE, STADES_AGRICOLE, getStades, DEF_CATS_VITICOLE, DEF_CATS_AGRICOLE, DEF_PRODUITS, DEF_PARCELLES, yearOf, cpPassages, nextPassageNum, getEx, calcIFT } from "./js/state.js";
+import { db, waitForAuth, exploitsCol, exploitDoc, sub, subdoc, baseCol, baseDoc, backupsCol } from "./js/firebase-data.js";
+import { renderPluvioPage, renderRainfallCard, renderPluvioStat, renderSitesMeteoSection, resetRainfallSync, forgetRainfallSync } from "./js/pluviometrie.js";
+import { renderProduits, renderEngrais, updateProduitsActions, applyConsommation, recalculerConsommation } from "./js/produits-stock.js";
+
+// ── FIREBASE : config, init, auth, chemins Firestore ──────────
+// extraits vers js/firebase-data.js le 19/07/2026 (etape 3 de la modularisation).
+
+// ── UTILS ────────────────────────────────────────────────────
+// fmtDate, toISO, addDaysToDate, esc, normText, toast, loading, confirm2
+// extraits vers js/utils.js le 19/07/2026 (etape 1 de la modularisation).
+// ── LOGIQUE SUR L'ETAT (yearOf, cpPassages, nextPassageNum, getEx, calcIFT) ────
+// extraits vers js/state.js le 19/07/2026 (avec l'etape 2 de la modularisation).
+
+// ── INIT ─────────────────────────────────────────────────────
+async function init() {
+  loading(true);
+  // Timeout securite : si Firebase ne repond pas en 10s, on cache le loading
+  const timeout = setTimeout(() => loading(false), 10000);
+
+  try {
+    await waitForAuth();
+  } catch (e) {
+    console.error('Erreur authentification', e);
+    loading(false);
+    toast("Erreur de connexion. Verifiez votre reseau et rechargez la page.");
+    return;
+  }
+
+  let firstLoad = true;
+  onSnapshot(exploitsCol(), snap => {
+    S.exploitations = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    if (!S.currentId && S.exploitations.length > 0) {
+      let derniereId = null;
+      try { derniereId = localStorage.getItem('derniereExploitationId'); } catch(e) {}
+      const match = derniereId && S.exploitations.find(e => e.id === derniereId);
+      S.currentId = match ? match.id : S.exploitations[0].id;
+      try { localStorage.setItem('derniereExploitationId', S.currentId); } catch(e) {}
+      listenExploit();
+    }
+    if (S.exploitations.length === 0) {
+      createDefaultExploit();
+    }
+    renderExploitations();
+    updateTopbar();
+    // Ne cacher le loading qu'apres le premier snapshot
+    if (firstLoad) {
+      firstLoad = false;
+      clearTimeout(timeout);
+      // Attendre que listenExploit charge les sous-collections
+      setTimeout(() => loading(false), 1500);
+      verifierSauvegardeAuto(); // en arriere-plan, ne bloque pas l'affichage
+    }
+  });
+}
+
+async function createDefaultExploit() {
+  const ref = await addDoc(exploitsCol(), {
+    nom: 'EI CORRE Christine', siret: '', certiphyto: '',
+    surface: 2.92, ab: false, type: 'viticole', createdAt: serverTimestamp()
+  });
+  S.currentId = ref.id;
+  const eid = ref.id;
+  // Parcelles dans l'exploitation
+  for (const p of DEF_PARCELLES) await addDoc(sub(eid,'parcelles'), p);
+  // Base viticole commune (si vide)
+  const baseCatSnap = await getDocs(baseCol('viticole','categories'));
+  if (baseCatSnap.empty) {
+    for (const cn of DEF_CATS_VITICOLE) await addDoc(baseCol('viticole','categories'), {nom:cn});
+    for (const p of DEF_PRODUITS) await addDoc(baseCol('viticole','produits'), p);
+  }
+  listenExploit();
+}
+
+function listenBase(type) {
+  S.unsubBase.forEach(u => u());
+  S.unsubBase = [];
+  S.unsubBase.push(onSnapshot(doc(db,'bases',type), snap => {
+    S.baseMeta = snap.exists() ? snap.data() : {};
+    if (document.getElementById('stock-recalc-info')) renderStockList();
+  }));
+  S.unsubBase.push(onSnapshot(baseCol(type,'produits'), snap => {
+    S.produits = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.produits.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
+  S.unsubBase.push(onSnapshot(baseCol(type,'categories'), snap => {
+    S.categories = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.categories.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
+  S.unsubBase.push(onSnapshot(baseCol(type,'applicateurs'), snap => {
+    S.applicateurs = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.applicateurs.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
+  S.unsubBase.push(onSnapshot(baseCol(type,'engrais'), snap => {
+    S.engrais = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.engrais.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
+}
+
+function listenExploit() {
+  S.unsubs.forEach(u => u());
+  S.unsubs = [];
+  const eid = S.currentId;
+  if (!eid) return;
+
+  // Passages : propres a l'exploitation
+  S.unsubs.push(onSnapshot(sub(eid,'passages'), snap => {
+    if (S.currentId !== eid) return; // callback obsolete (exploitation changee entre-temps)
+    S.passages = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.passages.sort((a,b) => toISO(a.date) < toISO(b.date) ? -1 : 1);
+    updateCampagneSelector();
+    render();
+  }));
+
+  // Parcelles : propres a l'exploitation
+  S.unsubs.push(onSnapshot(sub(eid,'parcelles'), snap => {
+    if (S.currentId !== eid) return;
+    S.parcelles = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.parcelles.sort((a,b) => a.nom.localeCompare(b.nom));
+    render();
+  }));
+
+  // Cultures : propres a l'exploitation (agricole)
+  S.unsubs.push(onSnapshot(sub(eid,'cultures'), snap => {
+    if (S.currentId !== eid) return;
+    S.cultures = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    S.cultures.sort((a,b) => a.nom.localeCompare(b.nom));
+  }));
+
+  // Sites meteo (communes suivies pour la pluviometrie) : propres a l'exploitation
+  S.unsubs.push(onSnapshot(sub(eid,'sitesMeteo'), snap => {
+    const list = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    list.sort((a,b) => (a.nom||'').localeCompare(b.nom||''));
+    S.sitesMeteoByExploit[eid] = list; // stocke sous la cle de CETTE exploitation, jamais dans un etat partage
+    forgetRainfallSync(eid); // la liste des sites a change, on force un nouveau cycle de synchro
+    if (S.currentId === eid) { S.pluvioData = {}; render(); }
+  }));
+
+  // Dates de récolte par campagne (propres à l'exploitation)
+  S.unsubs.push(onSnapshot(sub(eid,'campagnes'), snap => {
+    if (S.currentId !== eid) return;
+    S.datesRecolte = {};
+    S.recoltesConfirmees = {};
+    snap.docs.forEach(d => {
+      if (d.data().dateRecolte) S.datesRecolte[d.id] = d.data().dateRecolte;
+      S.recoltesConfirmees[d.id] = !!d.data().recolteConfirmee;
+    });
+    updateExportRecolteField();
+    render();
+  }));
+  // Produits et categories : base commune selon type exploitation
+  const ex = S.exploitations.find(e => e.id === eid);
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  listenBase(btype);
+}
+
+// ── CAMPAGNE ─────────────────────────────────────────────────
+function updateCampagneSelector() {
+  const years = [...new Set(S.passages.map(p => yearOf(p)))].sort().reverse();
+  const cur = String(new Date().getFullYear());
+  if (!years.includes(cur)) years.unshift(cur);
+  // Ne pas ecraser S.campagne si elle est deja definie (meme sans passages)
+  if (!S.campagne) S.campagne = years[0] || cur;
+  // Ajouter S.campagne a la liste si absente
+  if (!years.includes(S.campagne)) {
+    // Si la campagne courante n'a pas de passages, ajouter quand meme
+    years.unshift(S.campagne);
+  }
+  years.sort().reverse();
+  const sel = document.getElementById('campagne-select');
+  if (sel) {
+    sel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === S.campagne ? ' selected' : '') + '>' + y + '</option>').join('');
+    // S'assurer que S.campagne correspond bien à la valeur sélectionnée
+    if (sel.value) S.campagne = sel.value;
+  }
+  // Synchroniser le select export
+  const expSel = document.getElementById('export-campagne');
+  if (expSel) expSel.innerHTML = years.map(y => '<option value="' + y + '"' + (y === S.campagne ? ' selected' : '') + '>' + y + '</option>').join('');
+  updateExportResume();
+}
+window.onCampagneChange = function() {
+  const sel = document.getElementById('campagne-select');
+  if (!sel || !sel.value) return;
+  S.campagne = sel.value;
+  const expSel = document.getElementById('export-campagne');
+  if (expSel) expSel.value = S.campagne;
+  updateExportResume();
+  updateExportRecolteField();
+  render();
+};
+function updateExportRecolteField() {
+  const el = document.getElementById('export-recolte');
+  if (!el) return;
+  if (!S.datesRecolte) S.datesRecolte = {};
+  if (!S.recoltesConfirmees) S.recoltesConfirmees = {};
+  const expSel = document.getElementById('export-campagne');
+  const camp = (expSel && expSel.value) || S.campagne || '';
+  // Toujours vider puis remplir — évite que l'ancienne valeur reste
+  el.value = (camp && S.datesRecolte[camp]) ? S.datesRecolte[camp] : '';
+  const cb = document.getElementById('export-recolte-confirmee');
+  if (cb) cb.checked = !!(camp && S.recoltesConfirmees[camp]);
+}
+
+window.saveExportRecolte = async function(val) {
+  if (!S.currentId) return;
+  if (!S.datesRecolte) S.datesRecolte = {};
+  const camp = (document.getElementById('export-campagne') ? document.getElementById('export-campagne').value : null) || S.campagne || '';
+  if (!camp) return;
+  S.datesRecolte[camp] = val;
+  try {
+    await setDoc(doc(db, 'exploitations', S.currentId, 'campagnes', camp), {dateRecolte: val}, {merge: true});
+    toast('Date de recolte enregistree');
+    render();
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+};
+
+window.saveExportRecolteConfirmee = async function(checked) {
+  if (!S.currentId) return;
+  if (!S.recoltesConfirmees) S.recoltesConfirmees = {};
+  const camp = (document.getElementById('export-campagne') ? document.getElementById('export-campagne').value : null) || S.campagne || '';
+  if (!camp) return;
+  S.recoltesConfirmees[camp] = checked;
+  try {
+    await setDoc(doc(db, 'exploitations', S.currentId, 'campagnes', camp), {recolteConfirmee: checked}, {merge: true});
+    toast(checked ? 'Date de recolte marquee comme definitive' : 'Date de recolte remise en previsionnel');
+    render();
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+};
+
+function updateExportResume() {
+  const el = document.getElementById('export-resume');
+  if (!el) return;
+  const expSel = document.getElementById('export-campagne');
+  const year = expSel ? expSel.value : S.campagne;
+  const passages = S.passages.filter(p => yearOf(p) === year);
+  if (!passages.length) {
+    el.textContent = 'Campagne ' + year + ' : aucun passage enregistre.';
+  } else {
+    el.innerHTML = 'Campagne <strong>' + year + '</strong> : <strong>' + passages.length + '</strong> passage(s)';
+  }
+}
+
+// Quand on change le select export directement
+window.onExportCampagneChange = function() {
+  updateExportResume();
+  updateExportRecolteField();
+};
+
+window.newCampagne = function() {
+  const y = prompt('Annee de la campagne :', '');
+  if (!y || !/^\d{4}$/.test(y.trim())) { if(y !== null) toast('Annee invalide (ex: 2025)', true); return; }
+  S.campagne = y.trim();
+  updateCampagneSelector();
+  render();
+  toast('Campagne ' + S.campagne + ' selectionnee');
+};
+
+// ── NAV ──────────────────────────────────────────────────────
+window.showPage = function(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  const map = {dashboard:0, passages:1, produits:2, exploitations:3, export:4, parcelles:3, stock:2};
+  if (map[name] !== undefined) document.querySelectorAll('.tab')[map[name]].classList.add('active');
+  if (name === 'pluviometrie') renderPluvioPage();
+};
+
+// ── RENDER ───────────────────────────────────────────────────
+function updateTopbar() {
+  const sel = document.getElementById('exploit-select');
+  if (!sel) return;
+  const currentVal = sel.value;
+  sel.innerHTML = S.exploitations.map(e =>
+    '<option value="' + e.id + '"' + (e.id === S.currentId ? ' selected' : '') + '>' + e.nom + '</option>'
+  ).join('');
+  if (!sel.value && currentVal) sel.value = currentVal;
+}
+
+function render() {
+  updateTopbar();
+  const cp = cpPassages();
+  document.getElementById('stat-passages').textContent = cp.length;
+  const iftTotal = cp.filter(p => p.type !== 'engrais').reduce((sum, p) => { try { var v = (p.ift!==undefined && p.ift!==null ? p.ift : calcIFT(p)); return sum + (Number.isFinite(v) ? v : 0); } catch(e) { return sum; } }, 0);
+  document.getElementById('stat-ift').textContent = iftTotal.toFixed(2);
+  updateExportResume();
+  // Masquer date recolte pour agricole
+  const recGrp = document.getElementById('recolte-group');
+  if (recGrp) recGrp.style.display = (getEx() && getEx().type === 'agricole') ? 'none' : '';
+  const btlEl = document.getElementById('base-type-label');
+  if (btlEl) {
+    const exr = getEx();
+    const btr = (exr && exr.type === 'agricole') ? 'agricole' : 'viticole';
+    btlEl.textContent = 'Base commune ' + btr + ' — ' + S.produits.length + ' produit(s), ' + S.categories.length + ' categorie(s)';
+  }
+  renderDash(cp);
+  renderPassages(cp.filter(p => S.passagesView === 'engrais' ? (p.type === 'engrais') : (p.type !== 'engrais')));
+  updatePassagesActions();
+  renderProduits();
+  renderEngrais();
+  updateProduitsActions();
+  renderParcelles();
+  renderExploitations();
+}
+// Expose sur window : les modules "feuilles" (ex. pluviometrie.js) ont besoin d'appeler
+// le render() global apres une modification, mais ne peuvent pas l'importer (render() reste
+// dans ce script principal, qui n'est pas lui-meme un fichier module nomme/importable).
+window.render = render;
+
+function renderDash(cp) {
+  renderRainfallCard();
+  renderPluvioStat();
+  renderDarSummary(cp);
+  const el = document.getElementById('dash-passages');
+  if (!cp.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🌿</div><div class="empty-text">Aucun passage pour cette campagne</div></div>';
+    return;
+  }
+  const lastN = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).slice(0,15);
+  el.innerHTML = '<div class="table-wrap"><table><thead><tr><th>N</th><th>Date</th><th>Stade</th><th>DRE</th></tr></thead><tbody>' +
+    lastN.map(p => {
+      var dre = parseInt(p.dre, 10) || 0;
+      return '<tr><td><span class="badge badge-vert">' + (p.num||'-') + '</span></td><td>' + fmtDate(p.date) + '</td><td style="font-size:11px;max-width:130px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">' + esc(p.stade||'-') + '</td><td>' + (dre ? '<span class="badge badge-rouge">' + dre + 'h</span>' : '-') + '</td></tr>';
+    }).join('') +
+    '</tbody></table></div>';
+}
+
+// Resume DAR (delai avant recolte) sur le tableau de bord : calcule, parmi tous les passages phyto
+// de la campagne en cours, la date de recolte sans risque la plus tardive (DAR le plus contraignant),
+// et compare a la date de recolte prevue/confirmee si elle est renseignee (S.datesRecolte).
+// Reprend la meme logique que le badge DAR par passage (voir renderPassages/rightBadge).
+function renderDarSummary(cp) {
+  const card = document.getElementById('dar-summary-card');
+  const content = document.getElementById('dar-summary-content');
+  if (!card || !content) return;
+  const ex = getEx();
+  if (!ex || ex.type === 'agricole') { card.style.display = 'none'; return; }
+  const phytoCp = (cp||[]).filter(p => p.type !== 'engrais');
+  let maxDarSafeISO = '';
+  let passageRef = null;
+  phytoCp.forEach(p => {
+    const maxDar = (p.produitsList||[]).reduce((mx,pr) => Math.max(mx, parseInt(pr.dar,10)||0), 0);
+    if (!maxDar) return;
+    const darSafeISO = toISO(addDaysToDate(p.date, maxDar));
+    if (darSafeISO > maxDarSafeISO) { maxDarSafeISO = darSafeISO; passageRef = p; }
+  });
+  if (!maxDarSafeISO) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const darSafeFR = fmtDate(maxDarSafeISO);
+  const recolteISO = (S.datesRecolte && S.datesRecolte[S.campagne]) || '';
+  const recolteConfirmee = !!(S.recoltesConfirmees && S.recoltesConfirmees[S.campagne]);
+  let html = '<div style="font-size:14px;">Recolte possible sans risque a partir du <strong>' + darSafeFR + '</strong></div>' +
+    '<div style="font-size:11px;color:var(--gris);margin-top:4px;">Calcule sur le DAR le plus contraignant parmi les passages de la campagne ' + esc(S.campagne||'') + (passageRef ? ' (passage n' + esc(passageRef.num||'?') + ')' : '') + '.</div>';
+  if (recolteISO) {
+    const recolteFR = fmtDate(recolteISO);
+    const qualif = recolteConfirmee ? 'confirmee' : 'previsionnelle';
+    if (recolteISO < maxDarSafeISO) {
+      html += '<div style="margin-top:8px;"><span class="badge badge-rouge">DAR NON RESPECTE</span> Recolte ' + qualif + ' le ' + recolteFR + ', avant la date sans risque.</div>';
+    } else {
+      html += '<div style="margin-top:8px;"><span class="badge" style="background:#e0f5e9;color:#1a7a45;">DAR OK</span> Recolte ' + qualif + ' le ' + recolteFR + '.</div>';
+    }
+  }
+  content.innerHTML = html;
+}
+
+window.showPassagesView = function(view) {
+  document.getElementById('psubtab-phyto').classList.toggle('active', view==='phyto');
+  document.getElementById('psubtab-engrais').classList.toggle('active', view==='engrais');
+  S.passagesView = view;
+  render();
+};
+
+function updatePassagesActions() {
+  const el = document.getElementById('passages-actions');
+  if (!el) return;
+  el.innerHTML = S.passagesView === 'engrais'
+    ? '<button class="btn btn-primary btn-sm" onclick="openPassageEngraisModal(null)">+ Ajouter</button>'
+    : '<button class="btn btn-primary btn-sm" onclick="openPassageModal(null)">+ Ajouter</button>';
+}
+
+function renderPassages(cp) {
+  const el = document.getElementById('passages-list');
+  if (!cp || !cp.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Aucun passage - cliquez sur + Ajouter</div></div>';
+    return;
+  }
+  el.innerHTML = [...cp].sort((a,b) => toISO(b.date).localeCompare(toISO(a.date))).map(p => {
+    const isEng = p.type === 'engrais';
+    let bodyHTML, rightBadge = '';
+    if (isEng) {
+      const engs = p.engraisList || [];
+      bodyHTML = engs.map(e => {
+        const a = e.apportsCalcules || {};
+        const apportsTxt = ['n','p','k','mgo','so3','fe'].map(k => a[k] ? k.toUpperCase()+':'+a[k] : null).filter(Boolean).join(' / ') || '-';
+        return '<div class="prod-line"><span style="flex:1;font-weight:600;">' + esc(e.nom) + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (e.qte ? '<strong>' + e.qte + '</strong> ' + esc(e.unite||'') : '') + '</span><span style="font-size:11px;color:var(--vert);min-width:120px;text-align:right;">' + esc(apportsTxt) + '</span></div>';
+      }).join('') + (p.applicateurId ? '<div style="margin-top:6px;font-size:12px;color:var(--gris);">Applicateur : ' + esc(p.applicateurNom||'') + '</div>' : '') + (p.notes ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + esc(p.notes) + '</div>' : '');
+      rightBadge = '';
+    } else {
+    const prods = p.produitsList || [];
+    const byCat = {};
+    prods.forEach(pr => { if (!byCat[pr.cat]) byCat[pr.cat] = []; byCat[pr.cat].push(pr); });
+    bodyHTML = Object.entries(byCat).map(([cat,list]) =>
+      '<div class="prod-cat-title">' + esc(cat) + '</div>' +
+      list.map(pr => '<div class="prod-line"><span style="flex:1;font-weight:600;">' + esc(pr.nom) + '</span><span style="flex:1;text-align:center;font-size:13px;color:var(--gris);">' + (pr.qte ? '<strong>' + pr.qte + '</strong> ' + esc(pr.unite||'') : esc(pr.dose||'')) + '</span>' + (pr.dre ? '<span class="badge badge-rouge" style="font-size:10px;margin-left:auto;">DRE ' + pr.dre + 'h</span>' : '<span style="min-width:50px;"></span>') + '</div>').join('')
+    ).join('') + (function(){ var pctTxt = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : ''; var combined = [pctTxt, p.notes||''].filter(Boolean).join(' — '); return combined ? '<div style="margin-top:8px;font-size:12px;color:var(--gris);background:var(--gris-l);padding:8px;border-radius:6px;">' + esc(combined) + '</div>' : ''; })();
+    rightBadge = (function(){
+      try {
+        var d = parseInt(p.dre,10) || 0;
+        var m = (p.produitsList||[]).reduce(function(mx,pr){ return Math.max(mx, parseInt(pr.dre,10)||0); }, d);
+        var v = m || d;
+        var dreB = v ? '<span class="badge badge-rouge">DRE '+v+'h</span>' : '';
+        var iftV = (p.ift!==undefined && p.ift!==null ? p.ift : calcIFT(p));
+        var iftB = Number.isFinite(iftV) && iftV ? '<span class="badge" style="background:var(--vert-xxl);color:var(--vert);">IFT '+iftV.toFixed(2)+'</span>' : '';
+        var pctB = (p.pourcentSurface && p.pourcentSurface < 100) ? '<span class="badge" style="background:#fff3cd;color:#8a6d00;">'+p.pourcentSurface+'% surface</span>' : '';
+        var maxDar = (p.produitsList||[]).reduce(function(mx,pr){ return Math.max(mx, parseInt(pr.dar,10)||0); }, 0);
+        var darB = '';
+        if (maxDar) {
+          var darSafeFR = addDaysToDate(p.date, maxDar);
+          var darSafeISO = toISO(darSafeFR);
+          var recolteISO = (S.datesRecolte && S.datesRecolte[S.campagne]) || '';
+          var recolteConfirmee = !!(S.recoltesConfirmees && S.recoltesConfirmees[S.campagne]);
+          var qualif = recolteConfirmee ? 'confirmee' : 'previsionnelle';
+          if (recolteISO && darSafeISO > recolteISO) {
+            var recolteFR = fmtDate(recolteISO);
+            darB = '<span class="badge badge-rouge" title="Recolte '+qualif+' le '+recolteFR+' — recolte sans risque seulement a partir du '+darSafeFR+'">DAR NON</span>';
+          } else if (recolteISO) {
+            var recolteFR2 = fmtDate(recolteISO);
+            darB = '<span class="badge" style="background:#e0f5e9;color:#1a7a45;" title="Recolte sans risque des '+darSafeFR+' (recolte '+qualif+' le '+recolteFR2+')">DAR OK</span>';
+          } else {
+            darB = '<span class="badge" style="background:#e7e0ff;color:#5b3fd4;" title="Recolte possible sans risque a partir de cette date, compte tenu du DAR le plus long des produits appliques">DAR : recolte des '+darSafeFR+'</span>';
+          }
+        }
+        return dreB+iftB+pctB+darB;
+      } catch(e) { console.error('Erreur affichage badge passage', p.id, e); return ''; }
+    })();
+    }
+
+    return '<div class="passage-item">' +
+      '<div class="passage-header" onclick="togglePBody(\'pb' + p.id + '\')">' +
+        '<div class="passage-num">' + (p.num||'?') + '</div>' +
+        '<div><div class="passage-date">' + fmtDate(p.date) + (p.heureDebut ? ' — ' + p.heureDebut : '') + '</div>' +
+        '<div class="passage-meta">' + esc((p.parcelles||[]).join(', ')||'Toutes parcelles') + '</div></div>' +
+        '<div class="passage-right"><div style="font-size:11px;color:var(--gris);text-align:right;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(p.stade||'') + '</div>' +
+        '<div style="display:flex;gap:4px;">' + rightBadge + '</div></div>' +
+      '</div>' +
+      '<div class="passage-body" id="pb' + p.id + '">' + (bodyHTML || '<span style="font-size:12px;color:var(--gris);">Aucun produit saisi.</span>') +
+        '<div style="display:flex;gap:8px;margin-top:12px;">' +
+          '<button class="btn btn-icon edt" onclick="' + (isEng ? 'openPassageEngraisModal' : 'openPassageModal') + '(\'' + p.id + '\')" title="Modifier">✏️</button>' +
+          '<button class="btn btn-icon" onclick="duplicatePassage(\'' + p.id + '\')" title="Dupliquer">📄</button>' +
+          (S.exploitations.length > 1 ? '<button class="btn btn-icon" onclick="ouvrirChoixDuplicationExploit(\'' + p.id + '\')" title="Dupliquer vers une autre exploitation">📤</button>' : '') +
+          '<button class="btn btn-icon del" onclick="delPassage(\'' + p.id + '\')" title="Supprimer">🗑️</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+// Duplique un passage vers une AUTRE exploitation : les produits/doses/dates sont repris,
+// mais les parcelles sont effacees (elles ne correspondent pas forcement d'une exploitation a l'autre)
+// et devront etre re-selectionnees par l'utilisateur dans le nouveau formulaire.
+window.ouvrirChoixDuplicationExploit = function(id) {
+  const autres = S.exploitations.filter(e => e.id !== S.currentId);
+  if (!autres.length) { toast('Aucune autre exploitation disponible', true); return; }
+  const body = '<div class="form-group"><label>Dupliquer vers</label><select id="dup-exploit-choix">' +
+    autres.map(e => '<option value="' + e.id + '">' + e.nom + '</option>').join('') +
+    '</select></div>' +
+    '<div style="font-size:12px;color:var(--gris);margin-top:8px;">Les produits, doses et la date seront repris. Les parcelles ne sont pas reprises : a re-selectionner dans la nouvelle exploitation.</div>';
+  openModal('Dupliquer vers une autre exploitation', body, () => {
+    const targetId = document.getElementById('dup-exploit-choix').value;
+    duplicatePassageVersExploit(id, targetId);
+  });
+};
+
+window.duplicatePassageVersExploit = function(id, targetId) {
+  const src = S.passages.find(x => x.id === id);
+  if (!src) { toast('Passage introuvable', true); return; }
+  const clone = JSON.parse(JSON.stringify(src));
+  delete clone.id;
+  clone.parcelles = [];
+  clone.parcellesIds = [];
+  const isEngrais = src.type === 'engrais';
+  switchExploit(targetId);
+  toast('Basculement vers la nouvelle exploitation...');
+  setTimeout(() => {
+    if (isEngrais) {
+      clone.num = nextPassageNum('engrais');
+      openPassageEngraisModal(null, clone);
+    } else {
+      clone.num = nextPassageNum('phyto');
+      openPassageModal(null, clone);
+    }
+    toast('Passage duplique — selectionnez les parcelles et verifiez la date');
+  }, 600);
+};
+
+// Extraire quantite et unite depuis une chaine "1.5 L/HA"
+function extractQte(dose) {
+  if (!dose) return '';
+  const m = dose.match(/^([0-9.,]+)/);
+  return m ? m[1].replace(',','.') : '';
+}
+function extractUnite(dose, defaut) {
+  if (!dose) return defaut || 'L/HA';
+  for (const u of UNITES) {
+    if (dose.toUpperCase().includes(u)) return u;
+  }
+  return defaut || 'L/HA';
+}
+
+window.togglePill = function(pill) {
+  pill.classList.toggle('active');
+  if (pill.classList.contains('active')) {
+    const qteEl = pill.querySelector('.pill-qte');
+    const base = S.produits.find(p => p.nom === pill.dataset.nom && p.cat === pill.dataset.cat);
+    if (qteEl && base && !qteEl.value) {
+      qteEl.value = base.qte || extractQte(base.dose||'');
+      const uniteEl = pill.querySelector('.pill-unite');
+      if (uniteEl) uniteEl.value = base.unite || extractUnite(base.dose||'', 'L/HA');
+    }
+  }
+  recalcDRE();
+};
+
+window.updateStadesFromCulture = function() {
+  const cult = document.getElementById('f-culture');
+  const stadeEl = document.getElementById('f-stade');
+  if (!cult || !stadeEl) return;
+  const stades = STADES_AGRICOLE[cult.value] || [];
+  stadeEl.innerHTML = '<option value="">-- Choisir --</option>' + stades.map(s => '<option value="' + s + '">' + s + '</option>').join('');
+};
+
+function recalcDRE() {
+  const actives = document.querySelectorAll('.prod-pill.active');
+  let maxDre = 0;
+  actives.forEach(pill => {
+    const dre = parseInt(pill.dataset.dre) || 0;
+    if (dre > maxDre) maxDre = dre;
+  });
+  const field = document.getElementById('f-dre');
+  if (field) field.value = maxDre;
+}
+
+window.togglePctSurface = function() {
+  const link = document.getElementById('pct-toggle-link');
+  const wrap = document.getElementById('pct-surface-wrap');
+  if (link) link.style.display = 'none';
+  if (wrap) wrap.style.display = '';
+};
+
+window.insertGPSNotes = function() {
+  const checks = document.querySelectorAll('.parc-cb:checked');
+  const gpsLines = [];
+  checks.forEach(cb => {
+    const parc = S.parcelles.find(p => p.nom === cb.value);
+    if (parc && parc.gps) gpsLines.push(parc.nom + ' : ' + parc.gps);
+  });
+  if (!gpsLines.length) {
+    toast('Aucune coordonnee GPS sur les parcelles selectionnees', true);
+    return;
+  }
+  const notes = document.getElementById('f-notes');
+  if (!notes) return;
+  const existing = notes.value.trim();
+  const gpsText = 'GPS : ' + gpsLines.join(' | ');
+  notes.value = existing ? existing + '\n' + gpsText : gpsText;
+  toast('GPS inseres dans les notes');
+};
+
+window.insertGPSNotesEng = function() {
+  const checks = document.querySelectorAll('.parc-cb-eng:checked');
+  const gpsLines = [];
+  checks.forEach(cb => {
+    const parc = S.parcelles.find(p => p.nom === cb.value);
+    if (parc && parc.gps) gpsLines.push(parc.nom + ' : ' + parc.gps);
+  });
+  if (!gpsLines.length) {
+    toast('Aucune coordonnee GPS sur les parcelles selectionnees', true);
+    return;
+  }
+  const notes = document.getElementById('fe-notes');
+  if (!notes) return;
+  const existing = notes.value.trim();
+  const gpsText = 'GPS : ' + gpsLines.join(' | ');
+  notes.value = existing ? existing + '\n' + gpsText : gpsText;
+  toast('GPS inseres dans les notes');
+};
+
+
+// ── PLUVIOMETRIE ─────────────────────────────────────────────
+// getSitesMeteo, sync Open-Meteo, rendu dashboard/page detaillee, sites meteo CRUD,
+// import CSV : extraits vers js/pluviometrie.js le 19/07/2026 (etape 4 de la modularisation).
+window.selectAllParcelles = function(checked) {
+  document.querySelectorAll('.parc-cb').forEach(cb => cb.checked = checked);
+};
+
+window.togglePBody = function(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
+};
+
+
+function renderParcelles() {
+  const el = document.getElementById('parcelles-list');
+  if (!S.parcelles.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">🗺</div><div class="empty-text">Aucune parcelle</div></div>';
+    return;
+  }
+  const total = S.parcelles.reduce((s,p) => s + (parseFloat(p.surface)||0), 0);
+  el.innerHTML =
+    '<div class="parcelle-section-title">' +
+      '<div class="pst-label">Parcelles enregistrees</div>' +
+      '<div class="pst-stats">' +
+        '<div class="pst-stat"><div class="pst-stat-val">' + S.parcelles.length + '</div><div class="pst-stat-lbl">parcelles</div></div>' +
+        '<div class="pst-sep"></div>' +
+        '<div class="pst-stat"><div class="pst-stat-val">' + total.toFixed(2) + '</div><div class="pst-stat-lbl">hectares</div></div>' +
+      '</div>' +
+    '</div>' +
+    S.parcelles.map(p => {
+      const ex2 = getEx();
+      const infos = [];
+      if (p.surface) infos.push(p.surface + ' ha');
+      if (ex2 && ex2.type === 'agricole' && p.culture) infos.push(p.culture);
+      if (p.ville) infos.push(p.ville);
+      if (p.commune) infos.push('INSEE : ' + p.commune);
+      if (p.ilot) infos.push('Ilot ' + p.ilot);
+      if (p.gps) infos.push(p.gps);
+      return '<div class="parcelle-item">' +
+        '<div class="parcelle-left">' +
+          '<div class="parcelle-nom">' + esc(p.nom) + '</div>' +
+          (infos.length ? '<div class="parcelle-info">' + esc(infos.join(' · ')) + '</div>' : '') +
+        '</div>' +
+        '<div class="parcelle-actions">' +
+          '<button class="btn btn-icon edt" onclick="openParcelleModal(\'' + p.id + '\')" title="Modifier">&#9998;</button>' +
+          '<button class="btn btn-icon del" onclick="delParcelle(\'' + p.id + '\',\'' + p.nom + '\')" title="Supprimer">&#128465;</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+}
+
+
+function renderExploitations() {
+  const el = document.getElementById('exploit-list');
+  if (!S.exploitations.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-text">Aucune exploitation</div></div>';
+    return;
+  }
+  // La derniere exploitation consultee (active) est affichee en premier ; l'ordre des autres est conserve.
+  const sorted = [...S.exploitations].sort((a,b) => {
+    if (a.id === S.currentId) return -1;
+    if (b.id === S.currentId) return 1;
+    return 0;
+  });
+  el.innerHTML = sorted.map(e =>
+    '<div class="exploit-card ' + (e.id === S.currentId ? 'active-exploit' : '') + '">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;">' +
+        '<div>' +
+          '<div class="exploit-nom">' + esc(e.nom) + '</div>' +
+          '<div class="exploit-siret">SIRET : ' + esc(e.siret||'Non renseigne') + '</div>' +
+          '<div class="exploit-siret">Certiphyto : ' + esc(e.certiphyto||'-') + (e.certiphytoDate ? ' &mdash; val. ' + fmtDate(e.certiphytoDate) + (new Date(e.certiphytoDate) < new Date() ? ' <span style="color:var(--rouge);font-weight:700;">EXPIRE</span>' : '') : '') + '</div>' +
+        '</div>' +
+        (e.id === S.currentId ? '<span class="badge badge-vert">Active</span>' : '') +
+      '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">' +
+        '<span class="badge ' + (e.type==='agricole' ? 'badge-ocre' : 'badge-vert') + '">' + (e.type==='agricole' ? 'Agricole' : 'Viticole') + '</span>' +
+        '<span class="badge badge-gris">' + (e.surface||0) + ' ha</span>' +
+        (e.ab ? '<span class="badge badge-vert">Agriculture Biologique</span>' : '') +
+      '</div>' +
+      '<div class="exploit-actions">' +
+        (e.id !== S.currentId ? '<button class="btn btn-primary btn-sm" onclick="switchExploit(\'' + e.id + '\')">Activer</button>' : '') +
+        (e.id === S.currentId ? '<button class="btn btn-secondary btn-sm" onclick="showPage(\'parcelles\')">🗺️ Gerer les parcelles</button>' : '') +
+        '<button class="btn btn-icon edt" onclick="openExploitModal(\'' + e.id + '\')" title="Modifier">✏️</button>' +
+        '<button class="btn btn-icon del" onclick="delExploit(\'' + e.id + '\',\'' + e.nom + '\')" title="Supprimer">🗑️</button>' +
+      '</div>' +
+      // Section applicateurs uniquement pour l'exploitation active
+      (e.id === S.currentId ? renderApplicateursSection() : '') +
+      (e.id === S.currentId ? renderSitesMeteoSection() : '') +
+    '</div>'
+  ).join('');
+}
+
+// ── MODAL ────────────────────────────────────────────────────
+function openModal(title, body, saveFn) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = body;
+  const btn = document.getElementById('modal-save-btn');
+  btn.onclick = saveFn;
+  btn.style.display = saveFn ? '' : 'none';
+  document.getElementById('modal-overlay').classList.add('open');
+}
+window.openModal = openModal; // meme raison que window.render (voir plus haut)
+window.closeModal = function() {
+  document.getElementById('modal-overlay').classList.remove('open');
+};
+
+// ── PASSAGE ──────────────────────────────────────────────────
+window.openPassageModal = function(pid, dupData) {
+  const p = dupData || (pid ? S.passages.find(x => x.id === pid) : null);
+  const catNames = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(pr=>pr.cat)])];
+  const parOpts = S.parcelles.map(pa =>
+    '<option value="' + pa.nom + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' selected' : '') + '>' + esc(pa.nom) + '</option>'
+  ).join('');
+
+  const prodsHTML = catNames.map(cat => {
+    const existing = p ? (p.produitsList||[]).filter(pr => pr.cat === cat) : [];
+    const catProds = S.produits.filter(pr => pr.cat === cat && (pr.actif !== false || existing.some(e => e.nom === pr.nom))).sort((a,b) => (b.favori?1:0) - (a.favori?1:0));
+    if (!catProds.length) return '';
+    return '<div class="prod-pills-section">' +
+      '<div class="prod-pills-title">' + esc(cat) + '</div>' +
+      '<div class="prod-pills-grid">' +
+      catProds.map(pr => {
+        const sel = existing.find(e => e.nom === pr.nom);
+        const isActive = !!sel;
+        const selQte = sel ? (sel.qte !== undefined ? sel.qte : extractQte(sel.dose||'')) : (pr.qte || extractQte(pr.dose||''));
+        const selUnite = sel ? (sel.unite || extractUnite(sel.dose||'', pr.unite||'L/HA')) : (pr.unite || 'L/HA');
+        return '<div class="prod-pill' + (isActive ? ' active' : '') + '" data-cat="' + cat + '" data-nom="' + pr.nom + '" data-dre="' + (pr.dre||0) + '" data-amm="' + (pr.amm||'') + '" data-unite="' + selUnite + '" onclick="togglePill(this)">' +
+          '<div class="prod-pill-name">' + (pr.favori ? '⭐ ' : '') + esc(pr.nom) + '</div>' +
+          '<div class="prod-pill-dose" style="display:flex;align-items:center;gap:4px;">' +
+            '<input type="number" class="pill-qte" step="0.01" value="' + (selQte||'') + '" placeholder="qte" onclick="event.stopPropagation()" style="width:60px;">' +
+            '<select class="pill-unite" onclick="event.stopPropagation()" style="font-size:11px;padding:4px 5px;border:none;background:transparent;color:var(--vert);font-weight:600;cursor:pointer;">' +
+              UNITES.map(u => '<option value="' + u + '"' + (u===selUnite?' selected':'') + '>' + u + '</option>').join('') +
+            '</select>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+      '</div></div>';
+  }).join('');
+
+  const numVal = p ? p.num : nextPassageNum('phyto');
+  const dreVal = p ? p.dre||0 : 0;
+  const body =
+    '<div style="display:flex;gap:12px;margin-bottom:12px;">' +
+      '<div class="form-group" style="max-width:130px;"><label>Passage N (auto)</label><input type="number" id="f-num" value="' + numVal + '" readonly style="background:var(--vert-xxl);color:var(--vert);font-weight:600;"></div>' +
+      '<div class="form-group" style="max-width:150px;"><label>DRE max (h) — auto</label><input type="number" id="f-dre" value="' + dreVal + '" readonly style="background:var(--vert-xxl);color:var(--vert);font-weight:600;"></div>' +
+    '</div>' +
+    '<div class="form-grid" style="margin-bottom:12px;">' +
+      '<div class="form-group"><label>Campagne</label><input type="text" id="f-camp" value="' + (p ? yearOf(p) : S.campagne) + '"></div>' +
+      '<div class="form-group"><label>Date</label><input type="date" id="f-date" value="' + (p ? toISO(p.date) : '') + '"></div>' +
+      '<div class="form-group"><label>Heure debut (HH:MM)</label><input type="time" id="f-hdeb" value="' + (p ? p.heureDebut||'' : '') + '"></div>' +
+      '<div class="form-group"><label>Heure fin (HH:MM)</label><input type="time" id="f-hfin" value="' + (p ? p.heureFin||'' : '') + '"></div>' +
+    '</div>' +
+    (function(){
+      const ex = getEx();
+      const isAgri = ex && ex.type === 'agricole';
+      const cultOpts = isAgri ? S.cultures.map(cu =>
+        '<option value="' + cu.nom + '"' + (p&&p.culture===cu.nom?' selected':'') + '>' + cu.nom + '</option>'
+      ).join('') : '';
+      const stadesSrc = isAgri ? (p&&p.culture ? (STADES_AGRICOLE[p.culture]||[]) : []) : STADES_VITICOLE;
+      return (isAgri ?
+        '<div class="form-group" style="margin-bottom:12px;">' +
+          '<label>Culture</label>' +
+          '<select id="f-culture" onchange="updateStadesFromCulture()">' +
+            '<option value="">-- Choisir une culture --</option>' + cultOpts +
+          '</select>' +
+        '</div>' : '') +
+      '<div class="form-group" style="margin-bottom:12px;">' +
+        '<label>Stade phenologique</label>' +
+        '<select id="f-stade"><option value="">-- Choisir --</option>' + stadesSrc.map(s => '<option value="' + s + '"' + (p&&p.stade===s?' selected':'') + '>' + s + '</option>').join('') + '</select>' +
+      '</div>';
+    })() +
+    '<div style="margin-bottom:12px;">' +
+      '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--gris);margin-bottom:6px;">Parcelles traitees</div>' +
+      '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="selectAllParcelles(true)">Toutes</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="selectAllParcelles(false)">Aucune</button>' +
+      '</div>' +
+      '<div id="parc-checks" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
+      S.parcelles.map(pa =>
+        '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--gris-l);border-radius:8px;cursor:pointer;font-size:13px;">' +
+        '<input type="checkbox" class="parc-cb" value="' + pa.nom + '" data-id="' + pa.id + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--vert);cursor:pointer;flex-shrink:0;">' +
+        esc(pa.nom) + '</label>'
+      ).join('') +
+      '</div>' +
+      (function(){
+        const pctVal = p && p.pourcentSurface ? p.pourcentSurface : 100;
+        const partiel = pctVal !== 100;
+        return '<div id="pct-toggle-link" style="margin-top:10px;' + (partiel?'display:none;':'') + '">' +
+            '<button type="button" class="btn btn-secondary btn-sm" onclick="togglePctSurface()">Traitement partiel de la parcelle ?</button>' +
+          '</div>' +
+          '<div class="form-group" id="pct-surface-wrap" style="margin-top:10px;max-width:260px;' + (partiel?'':'display:none;') + '">' +
+            '<label>% de la surface traitee (desherbage localise)</label>' +
+            '<input type="number" id="f-pct-surface" min="1" max="100" value="' + pctVal + '">' +
+          '</div>';
+      })() +
+    '</div>' +
+    '<div class="section-title">Produits appliques</div>' +
+    prodsHTML +
+
+    '<div class="form-group" style="margin-top:10px;">' +
+      '<label>Applicateur</label>' +
+      '<select id="f-applicateur">' +
+        '<option value="">— ' + (getEx()?getEx().nom:'Exploitation') + ' (par defaut) —</option>' +
+        (S.applicateurs||[]).map(a => {
+          const expire = a.certiphytoDate && new Date(a.certiphytoDate) < new Date();
+          return '<option value="' + a.id + '"' + (p&&p.applicateurId===a.id?' selected':'') + (expire?' style="color:var(--rouge);"':'') + '>' + esc(a.nom) + (expire?' ⚠ EXPIRE':'') + '</option>';
+        }).join('') +
+      '</select>' +
+    '</div>' +
+    '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="f-notes" rows="3" placeholder="Conditions meteo...">' + esc(p?p.notes||'':'') + '</textarea></div>' +
+    '<div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="insertGPSNotes()">📍 Inserer GPS parcelles</button></div>';
+
+  openModal(pid ? 'Modifier le passage' : (dupData ? 'Nouveau passage (duplique)' : 'Nouveau passage'), body, () => savePassage(pid));
+};
+
+function prodLineHTML(cat, existing, catProds) {
+  const opts = catProds.map(p =>
+    '<option value="' + p.nom + '" data-dose="' + (p.dose||'') + '" data-dre="' + (p.dre||0) + '"' + (existing&&existing.nom===p.nom?' selected':'') + '>' + esc(p.nom) + '</option>'
+  ).join('');
+  return '<div class="prod-form-row" data-cat="' + cat + '">' +
+    '<select style="flex:2;" onchange="autoFillDose(this)" class="psel"><option value="">-- Produit --</option>' + opts + '</select>' +
+    '<input type="text" placeholder="Dose" style="flex:1;min-width:70px;" class="pdose" value="' + (existing?existing.dose||'':'') + '">' +
+    '<button type="button" class="btn btn-danger btn-icon" onclick="this.closest(\'.prod-form-row\').remove()" title="Retirer">✕</button>' +
+  '</div>';
+}
+
+window.addProdLine = function(cat, ckey) {
+  const catProds = S.produits.filter(p => p.cat === cat);
+  const container = document.getElementById(ckey);
+  if (!container) return;
+  const div = document.createElement('div');
+  div.innerHTML = prodLineHTML(cat, null, catProds);
+  container.appendChild(div.firstElementChild);
+};
+
+window.autoFillDose = function(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  if (opt && opt.dataset.dose) sel.nextElementSibling.value = opt.dataset.dose;
+};
+
+async function savePassage(pid) {
+  const dateISO = document.getElementById('f-date').value;
+  if (!dateISO) { toast('Veuillez indiquer une date', true); return; }
+  const dateRaw = fmtDate(dateISO);
+  const parcChecks = Array.from(document.querySelectorAll('.parc-cb:checked'));
+  const parc = parcChecks.map(cb=>cb.value);
+  const parcIds = parcChecks.map(cb=>cb.dataset.id||'');
+  const prodsList = [];
+  document.querySelectorAll('.prod-pill.active').forEach(pill => {
+    const nom = pill.dataset.nom;
+    const cat = pill.dataset.cat;
+    const qteEl = pill.querySelector('.pill-qte');
+    const uniteEl = pill.querySelector('.pill-unite');
+    const base = S.produits.find(p => p.nom === nom && p.cat === cat);
+    const qte = qteEl ? qteEl.value : '';
+    const unite = uniteEl ? uniteEl.value : (base ? base.unite||'L/HA' : 'L/HA');
+    const dose = qte ? (qte + ' ' + unite) : '';
+    prodsList.push({nom, cat, dose, qte: parseFloat(qte)||0, unite, dre: base ? base.dre : 0, dar: base ? base.dar||0 : 0, amm: base ? base.amm||'' : '', doseReferenceIFT: base && base.doseReference!==null && base.doseReference!==undefined ? parseFloat(base.doseReference) : null});
+  });
+  const cultEl2 = document.getElementById('f-culture');
+  const appSel2 = document.getElementById('f-applicateur');
+  const appId2 = appSel2 ? appSel2.value : '';
+  const appObj = appId2 ? S.applicateurs.find(a => a.id === appId2) : null;
+  const data = {
+    type: 'phyto',
+    num: parseInt(document.getElementById('f-num').value)||1,
+    campagne: document.getElementById('f-camp').value || S.campagne,
+    culture: cultEl2 ? cultEl2.value : '',
+    date: dateRaw,
+    heureDebut: document.getElementById('f-hdeb').value,
+    heureFin: document.getElementById('f-hfin').value,
+    stade: document.getElementById('f-stade').value,
+    dre: parseInt(document.getElementById('f-dre').value)||0,
+    parcelles: parc,
+    parcellesIds: parcIds,
+    pourcentSurface: Math.min(100, Math.max(1, parseFloat(document.getElementById('f-pct-surface').value) || 100)),
+    produitsList: prodsList,
+    ift: (function(){ try { var pct = Math.min(100, Math.max(1, parseFloat(document.getElementById('f-pct-surface').value) || 100)); var v = calcIFT({type:'phyto', parcelles: parc, parcellesIds: parcIds, pourcentSurface: pct, produitsList: prodsList}); return Number.isFinite(v) ? Math.round(v * 1000) / 1000 : 0; } catch(e) { console.error('Erreur calcul IFT', e); return 0; } })(),
+
+    applicateurId: appId2 || '',
+    applicateurNom: appObj ? appObj.nom : (getEx() ? getEx().nom : ''),
+    applicateurSiret: appObj ? appObj.siret||'' : (getEx() ? getEx().siret||'' : ''),
+    notes: document.getElementById('f-notes').value,
+    updatedAt: serverTimestamp()
+  };
+  try {
+    const eid = S.currentId;
+    const oldData = pid ? S.passages.find(x => x.id === pid) : null;
+    if (pid) await updateDoc(subdoc(eid,'passages',pid), data);
+    else { data.createdAt = serverTimestamp(); await addDoc(sub(eid,'passages'), data); }
+    if (oldData) await applyConsommation(oldData, -1); // retire l'ancienne consommation avant d'appliquer la nouvelle
+    await applyConsommation(data, +1);
+    closeModal(); toast('Passage enregistre');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+window.delPassage = function(id) {
+  confirm2('Supprimer ce passage ?', 'Cette action est irreversible.', async () => {
+    const oldData = S.passages.find(x => x.id === id);
+    await deleteDoc(subdoc(S.currentId,'passages',id));
+    if (oldData) await applyConsommation(oldData, -1);
+    toast('Passage supprime');
+  });
+};
+
+// Duplique un passage existant (phyto ou engrais) : ouvre un formulaire "Nouveau"
+// pre-rempli avec les memes parcelles/produits, la date reste a verifier/modifier.
+window.duplicatePassage = function(id) {
+  const src = S.passages.find(x => x.id === id);
+  if (!src) { toast('Passage introuvable', true); return; }
+  const clone = JSON.parse(JSON.stringify(src));
+  delete clone.id;
+  if (src.type === 'engrais') {
+    clone.num = nextPassageNum('engrais');
+    openPassageEngraisModal(null, clone);
+  } else {
+    clone.num = nextPassageNum('phyto');
+    openPassageModal(null, clone);
+  }
+  toast('Passage duplique — verifiez la date avant d\'enregistrer');
+};
+
+// ── PASSAGE ENGRAIS (formulaire dedie) ────────────────────────
+window.openPassageEngraisModal = function(pid, dupData) {
+  const p = dupData || (pid ? S.passages.find(x => x.id === pid && x.type === 'engrais') : null);
+  const cats = [...new Set(S.engrais.map(eg => eg.categorie || 'Autre'))];
+  const existingEng = p ? (p.engraisList||[]) : [];
+
+  const engraisHTML = !S.engrais.length
+    ? '<div class="empty" style="padding:20px;"><div class="empty-text">Aucun engrais dans la base — ajoutez-en depuis l\'onglet Produits.</div></div>'
+    : cats.map(cat => {
+        const catEngs = S.engrais.filter(eg => (eg.categorie||'Autre') === cat);
+        const existing = existingEng.filter(eg => (eg.categorie||'Autre') === cat);
+        return '<div class="prod-pills-section">' +
+          '<div class="prod-pills-title">' + esc(cat) + '</div>' +
+          '<div class="prod-pills-grid">' +
+          catEngs.map(eg => {
+            const sel = existing.find(e => e.nom === eg.nom);
+            const isActive = !!sel;
+            const selQte = sel ? sel.qte : eg.qte;
+            const selUnite = sel ? sel.unite : (eg.unite || 'kg/ha');
+            const c = eg.composition || {};
+            return '<div class="prod-pill eng-pill' + (isActive ? ' active' : '') + '" data-cat="' + cat + '" data-nom="' + eg.nom + '" ' +
+              'data-n="' + (c.n||0) + '" data-p="' + (c.p||0) + '" data-k="' + (c.k||0) + '" data-mgo="' + (c.mgo||0) + '" data-so3="' + (c.so3||0) + '" data-fe="' + (c.fe||0) + '" ' +
+              'onclick="this.classList.toggle(\'active\')">' +
+              '<div class="prod-pill-name">' + esc(eg.nom) + '</div>' +
+              '<div class="prod-pill-dose" style="display:flex;align-items:center;gap:4px;">' +
+                '<input type="number" class="pill-qte" step="0.01" value="' + (selQte||'') + '" placeholder="qte" onclick="event.stopPropagation()" style="width:60px;">' +
+                '<select class="pill-unite" onclick="event.stopPropagation()" style="font-size:11px;padding:4px 5px;border:none;background:transparent;color:var(--vert);font-weight:600;cursor:pointer;">' +
+                  '<option value="kg/ha"' + (selUnite==='kg/ha'?' selected':'') + '>kg/ha</option>' +
+                  '<option value="L/ha"' + (selUnite==='L/ha'?' selected':'') + '>L/ha</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>';
+          }).join('') +
+          '</div></div>';
+      }).join('');
+
+  const numValEng = p ? p.num : nextPassageNum('engrais');
+  const body =
+    '<div style="display:flex;gap:12px;margin-bottom:12px;">' +
+      '<div class="form-group" style="max-width:130px;"><label>Passage N (auto)</label><input type="number" id="fe-num" value="' + numValEng + '" readonly style="background:var(--vert-xxl);color:var(--vert);font-weight:600;"></div>' +
+    '</div>' +
+    '<div class="form-grid" style="margin-bottom:12px;">' +
+      '<div class="form-group"><label>Campagne</label><input type="text" id="fe-camp" value="' + (p ? yearOf(p) : S.campagne) + '"></div>' +
+      '<div class="form-group"><label>Date</label><input type="date" id="fe-date" value="' + (p ? toISO(p.date) : '') + '"></div>' +
+    '</div>' +
+    '<div style="margin-bottom:12px;">' +
+      '<div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--gris);margin-bottom:6px;">Parcelles concernees</div>' +
+      '<div style="display:flex;gap:6px;margin-bottom:8px;">' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="selectAllParcellesEng(true)">Toutes</button>' +
+        '<button type="button" class="btn btn-secondary btn-sm" onclick="selectAllParcellesEng(false)">Aucune</button>' +
+      '</div>' +
+      '<div id="parc-checks-eng" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
+      S.parcelles.map(pa =>
+        '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--gris-l);border-radius:8px;cursor:pointer;font-size:13px;">' +
+        '<input type="checkbox" class="parc-cb-eng" value="' + pa.nom + '" data-id="' + pa.id + '"' + (p && (p.parcelles||[]).includes(pa.nom) ? ' checked' : '') + ' style="width:20px;height:20px;accent-color:var(--vert);cursor:pointer;flex-shrink:0;">' +
+        esc(pa.nom) + '</label>'
+      ).join('') +
+      '</div>' +
+    '</div>' +
+    '<div class="section-title">Engrais appliques</div>' +
+    engraisHTML +
+    '<div class="form-group" style="margin-top:10px;">' +
+      '<label>Applicateur</label>' +
+      '<select id="fe-applicateur">' +
+        '<option value="">— ' + (getEx()?getEx().nom:'Exploitation') + ' (par defaut) —</option>' +
+        (S.applicateurs||[]).map(a => {
+          const expire = a.certiphytoDate && new Date(a.certiphytoDate) < new Date();
+          return '<option value="' + a.id + '"' + (p&&p.applicateurId===a.id?' selected':'') + (expire?' style="color:var(--rouge);"':'') + '>' + a.nom + (expire?' ⚠ EXPIRE':'') + '</option>';
+        }).join('') +
+      '</select>' +
+    '</div>' +
+    '<div class="form-group" style="margin-top:10px;"><label>Notes / observations</label><textarea id="fe-notes" rows="3" placeholder="Conditions, parcelle test...">' + esc(p?p.notes||'':'') + '</textarea></div>' +
+    '<div style="margin-top:6px;"><button type="button" class="btn btn-secondary btn-sm" onclick="insertGPSNotesEng()">📍 Inserer GPS parcelles</button></div>';
+
+  openModal(pid ? 'Modifier le passage engrais' : (dupData ? 'Nouveau passage engrais (duplique)' : 'Nouveau passage engrais'), body, () => savePassageEngrais(pid));
+};
+
+window.selectAllParcellesEng = function(val) {
+  document.querySelectorAll('.parc-cb-eng').forEach(cb => cb.checked = val);
+};
+
+async function savePassageEngrais(pid) {
+  const dateISO = document.getElementById('fe-date').value;
+  if (!dateISO) { toast('Veuillez indiquer une date', true); return; }
+  const dateRaw = fmtDate(dateISO);
+  const parcChecksEng = Array.from(document.querySelectorAll('.parc-cb-eng:checked'));
+  const parc = parcChecksEng.map(cb=>cb.value);
+  const parcIds = parcChecksEng.map(cb=>cb.dataset.id||'');
+
+  const engList = [];
+  document.querySelectorAll('.eng-pill.active').forEach(pill => {
+    const nom = pill.dataset.nom;
+    const cat = pill.dataset.cat;
+    const qteEl = pill.querySelector('.pill-qte');
+    const uniteEl = pill.querySelector('.pill-unite');
+    const qte = parseFloat(qteEl ? qteEl.value : 0) || 0;
+    const unite = uniteEl ? uniteEl.value : 'kg/ha';
+    const compoPct = {
+      n: parseFloat(pill.dataset.n)||0, p: parseFloat(pill.dataset.p)||0,
+      k: parseFloat(pill.dataset.k)||0, mgo: parseFloat(pill.dataset.mgo)||0,
+      so3: parseFloat(pill.dataset.so3)||0, fe: parseFloat(pill.dataset.fe)||0
+    };
+    // Apport reel (kg/ha) = dose appliquee x % de composition / 100.
+    // Hypothese : 1 L/ha ~ 1 kg/ha (densite proche de 1 pour la plupart des solutions engrais).
+    const apportsCalcules = {};
+    Object.keys(compoPct).forEach(k => { apportsCalcules[k] = Math.round(qte * compoPct[k] / 100 * 100) / 100; });
+    engList.push({nom, categorie: cat, qte, unite, composition: compoPct, apportsCalcules});
+  });
+
+  if (!engList.length) { toast('Selectionnez au moins un engrais', true); return; }
+
+  const appSelEng = document.getElementById('fe-applicateur');
+  const appIdEng = appSelEng ? appSelEng.value : '';
+  const appObjEng = appIdEng ? S.applicateurs.find(a => a.id === appIdEng) : null;
+
+  const data = {
+    type: 'engrais',
+    num: parseInt(document.getElementById('fe-num').value)||1,
+    campagne: document.getElementById('fe-camp').value || S.campagne,
+    date: dateRaw,
+    parcelles: parc,
+    parcellesIds: parcIds,
+    engraisList: engList,
+    applicateurId: appIdEng || '',
+    applicateurNom: appObjEng ? appObjEng.nom : (getEx() ? getEx().nom : ''),
+    applicateurSiret: appObjEng ? appObjEng.siret||'' : (getEx() ? getEx().siret||'' : ''),
+    notes: document.getElementById('fe-notes').value,
+    updatedAt: serverTimestamp()
+  };
+  try {
+    const eid = S.currentId;
+    const oldData = pid ? S.passages.find(x => x.id === pid) : null;
+    if (pid) await updateDoc(subdoc(eid,'passages',pid), data);
+    else { data.createdAt = serverTimestamp(); await addDoc(sub(eid,'passages'), data); }
+    if (oldData) await applyConsommation(oldData, -1);
+    await applyConsommation(data, +1);
+    closeModal(); toast('Passage engrais enregistre');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+
+// ── PARCELLE ─────────────────────────────────────────────────
+window.openParcelleModal = function(pid) {
+  const p = pid ? S.parcelles.find(x => x.id === pid) : null;
+  const ex = getEx();
+  const isAgri = ex && ex.type === 'agricole';
+  const cultOpts = isAgri ? S.cultures.map(cu =>
+    '<option value="' + cu.nom + '"' + (p && p.culture === cu.nom ? ' selected' : '') + '>' + cu.nom + '</option>'
+  ).join('') : '';
+  const body =
+    '<div class="form-grid">' +
+      '<div class="form-group full"><label>Nom de la parcelle</label><input type="text" id="fpar-nom" value="' + (p?p.nom:'') + '" placeholder="LES PARADIS" style="text-transform:uppercase;"></div>' +
+      (isAgri ? '<div class="form-group full"><label>Culture en cours (' + S.campagne + ')</label><select id="fpar-culture"><option value="">-- Choisir --</option>' + cultOpts + '</select></div>' : '') +
+      '<div class="form-group"><label>Surface (ha)</label><input type="number" id="fpar-surf" step="0.01" value="' + (p?p.surface||'':'') + '" placeholder="0.00"></div>' +
+      '<div class="form-group"><label>N Ilot RPG</label><input type="text" id="fpar-ilot" value="' + (p?p.ilot||'':'') + '"></div>' +
+'<div class="form-group"><label>Nom de la commune</label><input type="text" id="fpar-ville" value="' + (p?p.ville||'':'') + '" placeholder="ex: Vertus"></div>' +
+      '<div class="form-group"><label>Code INSEE</label><input type="text" id="fpar-com" value="' + (p?p.commune||'':'') + '" placeholder="ex: 51606"></div>' +
+      '<div class="form-group full"><label>Coordonnees GPS</label><input type="text" id="fpar-gps" value="' + (p?p.gps||'':'') + '" placeholder="48.123, 3.456"></div>' +
+    '</div>';
+  openModal(p ? 'Modifier la parcelle' : 'Nouvelle parcelle', body, () => saveParcelle(pid));
+};
+
+async function saveParcelle(pid) {
+  const nom = document.getElementById('fpar-nom').value.toUpperCase().trim();
+  if (!nom) { toast('Nom requis', true); return; }
+  const cultEl = document.getElementById('fpar-culture');
+  const data = {nom, culture: cultEl ? cultEl.value : '', surface:parseFloat(document.getElementById('fpar-surf').value)||0, ilot:document.getElementById('fpar-ilot').value, ville:document.getElementById('fpar-ville').value, commune:document.getElementById('fpar-com').value, gps:document.getElementById('fpar-gps').value};
+  try {
+    const eid = S.currentId;
+    if (pid) await updateDoc(subdoc(eid,'parcelles',pid), data);
+    else await addDoc(sub(eid,'parcelles'), data);
+    closeModal(); toast('Parcelle enregistree');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+window.delParcelle = function(id, nom) {
+  confirm2('Supprimer "' + nom + '" ?', 'Les passages existants ne seront pas modifies.', async () => {
+    await deleteDoc(subdoc(S.currentId,'parcelles',id));
+    toast('Parcelle supprimee');
+  });
+};
+
+// ── EXPLOITATION ─────────────────────────────────────────────
+window.openExploitModal = function(eid) {
+  const e = eid ? S.exploitations.find(x => x.id === eid) : null;
+  const isNew = !eid;
+  const body =
+    '<div class="form-grid">' +
+      (isNew ? '<div class="form-group full"><label>Type d exploitation</label><select id="fe-type" onchange="onExploitTypeChange()" style="font-weight:600;color:var(--vert);"><option value="viticole">Viticole</option><option value="agricole">Agricole</option></select></div>' : '<input type="hidden" id="fe-type" value="' + (e?e.type||'viticole':'viticole') + '">') +
+      '<div class="form-group full"><label>Raison sociale / Nom</label><input type="text" id="fe-nom" value="' + (e?e.nom:'') + '" placeholder="EI DUPONT Jean"></div>' +
+      '<div class="form-group"><label>N SIRET (14 chiffres)</label><input type="text" id="fe-siret" maxlength="14" value="' + (e?e.siret||'':'') + '"></div>' +
+      '<div class="form-group"><label>N Certiphyto</label><input type="text" id="fe-cert" value="' + (e?e.certiphyto||'':'') + '"></div>' +
+      '<div class="form-group"><label>Validite Certiphyto</label><input type="date" id="fe-certdate" value="' + (e?e.certiphytoDate||'':'') + '"></div>' +
+      '<div class="form-group"><label>Surface totale (ha)</label><input type="number" id="fe-surf" step="0.01" value="' + (e?e.surface||'':'') + '"></div>' +
+      '<div class="form-group"><label>Agriculture Biologique</label><select id="fe-ab"><option value="false"' + (e&&!e.ab?' selected':'') + '>Non</option><option value="true"' + (e&&e.ab?' selected':'') + '>Oui</option></select></div>' +
+    '</div>' +
+    (isNew ? '<div id="fe-type-info" style="margin-top:10px;padding:10px 14px;background:var(--vert-xxl);border-radius:var(--r-sm);font-size:12px;color:var(--vert);">Base produits phytosanitaires viticole partagee (commune a toutes les exploitations viticoles) + stades phenologiques vigne.</div>' : '');
+  openModal(e ? 'Modifier l exploitation' : 'Nouvelle exploitation', body, () => saveExploit(eid));
+};
+
+async function saveExploit(eid) {
+  const nom = document.getElementById('fe-nom').value.trim();
+  if (!nom) { toast('Nom requis', true); return; }
+  const type = (document.getElementById('fe-type') ? document.getElementById('fe-type').value : null) || 'viticole';
+  const data = {nom, type, siret:document.getElementById('fe-siret').value, certiphyto:document.getElementById('fe-cert').value, certiphytoDate:document.getElementById('fe-certdate').value||'', surface:parseFloat(document.getElementById('fe-surf').value)||0, ab:document.getElementById('fe-ab').value==='true'};
+  try {
+    if (eid) {
+      await updateDoc(exploitDoc(eid), data);
+      closeModal(); toast('Exploitation enregistree');
+    } else {
+      data.createdAt = serverTimestamp();
+      const ref = await addDoc(exploitsCol(), data);
+      S.currentId = ref.id;
+      if (type === 'viticole') {
+        // Verifier si la base viticole existe, sinon l'initialiser
+        const baseCatSnap = await getDocs(baseCol('viticole','categories'));
+        if (baseCatSnap.empty) {
+          for (const cn of DEF_CATS_VITICOLE) await addDoc(baseCol('viticole','categories'), {nom:cn});
+          for (const p of DEF_PRODUITS) await addDoc(baseCol('viticole','produits'), p);
+        }
+      } else {
+        // Verifier si la base agricole existe, sinon l'initialiser
+        const baseAgriSnap = await getDocs(baseCol('agricole','categories'));
+        if (baseAgriSnap.empty) {
+          for (const cn of DEF_CATS_AGRICOLE) await addDoc(baseCol('agricole','categories'), {nom:cn});
+        }
+        // Cultures propres a l'exploitation
+        for (const cult of CULTURES_AGRICOLE) await addDoc(sub(ref.id,'cultures'), {nom:cult});
+      }
+      listenExploit();
+      closeModal(); toast('Exploitation creee');
+    }
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+window.onExploitTypeChange = function() {
+  const type = document.getElementById('fe-type').value;
+  const info = document.getElementById('fe-type-info');
+  if (!info) return;
+  if (type === 'viticole') {
+    info.textContent = 'Base produits phytosanitaires viticole partagee (commune a toutes les exploitations viticoles) + stades phenologiques vigne.';
+  } else {
+    info.textContent = 'Base produits phytosanitaires agricole partagee (commune a toutes les exploitations agricoles) + stades par culture (Ble, Orge, Colza, Tournesol, Mais).';
+  }
+};
+
+function renderApplicateursSection() {
+  const ex = getEx();
+  if (!ex) return '';
+  if (!S.applicateurs) S.applicateurs = [];
+  return '<div style="margin-top:14px;border-top:1px solid var(--gris-l);padding-top:14px;">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">' +
+      '<div style="font-size:12px;font-weight:700;color:var(--vert);text-transform:uppercase;letter-spacing:.5px;">Applicateurs / Prestataires</div>' +
+      '<button class="btn btn-primary btn-sm" onclick="openApplicateurModal(null)">+ Ajouter</button>' +
+    '</div>' +
+    (S.applicateurs.length === 0 ?
+      '<div style="font-size:12px;color:var(--gris);opacity:.6;">Aucun prestataire — l exploitation elle-meme est applicateur par defaut.</div>' :
+      '<div style="display:flex;flex-direction:column;gap:6px;">' +
+      S.applicateurs.map(a => {
+        const expire = a.certiphytoDate && new Date(a.certiphytoDate) < new Date();
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--gris-l);border-radius:var(--r-sm);">' +
+          '<div>' +
+            '<div style="font-weight:600;font-size:13px;">' + esc(a.nom) + (expire ? ' <span style="color:var(--rouge);font-size:11px;">⚠ Certiphyto expire</span>' : '') + '</div>' +
+            '<div style="font-size:11px;color:var(--gris);">SIRET : ' + esc(a.siret||'-') + ' &nbsp;·&nbsp; Certiphyto : ' + esc(a.certiphyto||'-') + (a.certiphytoDate ? ' (val. ' + fmtDate(a.certiphytoDate) + ')' : '') + '</div>' +
+          '</div>' +
+          '<div style="display:flex;gap:4px;">' +
+            '<button class="btn btn-icon edt" onclick="openApplicateurModal(\'' + a.id + '\')" title="Modifier">✏️</button>' +
+            '<button class="btn btn-icon del" onclick="delApplicateur(\'' + a.id + '\',\'' + a.nom + '\')" title="Supprimer">🗑️</button>' +
+          '</div>' +
+        '</div>';
+      }).join('') +
+      '</div>'
+    ) +
+  '</div>';
+}
+
+// ── MODAL APPLICATEUR ──
+window.openApplicateurModal = function(aid) {
+  const a = aid ? S.applicateurs.find(x => x.id === aid) : null;
+  const body =
+    '<div class="form-grid">' +
+      '<div class="form-group full"><label>Nom du prestataire *</label><input type="text" id="fa-nom" value="' + (a?a.nom:'') + '" placeholder="ex: EARL DUPONT"></div>' +
+      '<div class="form-group"><label>N SIRET (14 chiffres)</label><input type="text" id="fa-siret" maxlength="14" value="' + (a?a.siret||'':'') + '"></div>' +
+      '<div class="form-group"><label>N Certiphyto</label><input type="text" id="fa-cert" value="' + (a?a.certiphyto||'':'') + '"></div>' +
+      '<div class="form-group full"><label>Date de validite Certiphyto</label><input type="date" id="fa-certdate" value="' + (a?a.certiphytoDate||'':'') + '"></div>' +
+    '</div>';
+  openModal(a ? 'Modifier applicateur' : 'Nouvel applicateur', body, () => saveApplicateur(aid));
+};
+
+async function saveApplicateur(aid) {
+  const nom = document.getElementById('fa-nom').value.trim();
+  if (!nom) { toast('Nom requis', true); return; }
+  const ex = getEx();
+  const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+  const data = {nom, siret:document.getElementById('fa-siret').value, certiphyto:document.getElementById('fa-cert').value, certiphytoDate:document.getElementById('fa-certdate').value||''};
+  try {
+    if (aid) await setDoc(baseDoc(btype,'applicateurs',aid), data, {merge:true});
+    else await addDoc(baseCol(btype,'applicateurs'), data);
+    closeModal(); toast('Applicateur enregistre');
+  } catch(e) { toast('Erreur : ' + e.message, true); }
+}
+
+window.delApplicateur = function(id, nom) {
+  confirm2('Supprimer "' + nom + '" ?', 'Cet applicateur sera retire de la liste. Les passages existants ne sont pas modifies.', async () => {
+    const ex = getEx();
+    const btype = (ex && ex.type === 'agricole') ? 'agricole' : 'viticole';
+    await deleteDoc(baseDoc(btype,'applicateurs',id));
+    toast('Applicateur supprime');
+  });
+};
+
+window.switchExploit = function(id) {
+  if (id === S.currentId) return;
+  S.currentId = id;
+  try { localStorage.setItem('derniereExploitationId', id); } catch(e) {}
+  S.datesRecolte = {}; // Reset en memoire, Firebase va repeupler via listener
+  resetRainfallSync();
+  listenExploit();
+  toast('Exploitation activee');
+};
+
+window.delExploit = function(id, nom) {
+  if (S.exploitations.length <= 1) { toast('Impossible de supprimer la derniere exploitation', true); return; }
+  confirm2('Supprimer "' + nom + '" ?', 'Attention : les donnees (passages, produits, parcelles) restent dans Firebase mais l exploitation sera retiree de la liste.', async () => {
+    await deleteDoc(exploitDoc(id));
+    if (S.currentId === id) {
+      const other = S.exploitations.find(e => e.id !== id);
+      if (other) { S.currentId = other.id; try { localStorage.setItem('derniereExploitationId', other.id); } catch(e) {} listenExploit(); }
+    }
+    toast('Exploitation supprimee');
+  });
+};
+
+// ── EXPORT ───────────────────────────────────────────────────
+// Construit le dump complet de la base (toutes exploitations + bases communes viticole/agricole).
+// Utilise a la fois pour l'export JSON manuel et pour la sauvegarde automatique (voir plus bas).
+async function construireDumpComplet() {
+  const dump = { genereLe: new Date().toISOString(), exploitations: [], bases: {} };
+  const expSnap = await getDocs(exploitsCol());
+  for (const expDoc of expSnap.docs) {
+    const eid = expDoc.id;
+    const exData = { id: eid, ...expDoc.data() };
+    for (const sousColl of ['passages', 'parcelles', 'cultures', 'campagnes']) {
+      const sSnap = await getDocs(sub(eid, sousColl));
+      exData[sousColl] = sSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+    dump.exploitations.push(exData);
+  }
+  for (const type of ['viticole', 'agricole']) {
+    dump.bases[type] = {};
+    for (const nom of ['produits', 'categories', 'applicateurs', 'engrais']) {
+      const bSnap = await getDocs(baseCol(type, nom));
+      dump.bases[type][nom] = bSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+  }
+  return dump;
+}
+
+window.exportSauvegardeJSON = async function() {
+  try {
+    toast('Preparation de la sauvegarde...');
+    const dump = await construireDumpComplet();
+    const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const today = new Date().toISOString().slice(0, 10);
+    a.href = url;
+    a.download = `sauvegarde-registre-phyto-${today}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('Sauvegarde telechargee');
+  } catch (e) {
+    console.error('Erreur sauvegarde JSON', e);
+    toast('Erreur lors de la sauvegarde', true);
+  }
+};
+
+// Sauvegarde automatique (ajoutee le 15/07/2026) : une fois par jour (par appareil, via localStorage),
+// enregistre le meme dump complet que l'export manuel dans la collection Firestore `backups`,
+// et ne conserve que les NB_BACKUPS_MAX plus recentes pour eviter une croissance illimitee.
+const NB_BACKUPS_MAX = 20;
+async function verifierSauvegardeAuto() {
+  const aujourdHui = new Date().toISOString().slice(0, 10);
+  let derniere = null;
+  try { derniere = localStorage.getItem('derniereSauvegardeAutoDate'); } catch(e) {}
+  if (derniere === aujourdHui) return; // deja fait aujourd'hui sur cet appareil
+  try {
+    const dump = await construireDumpComplet();
+    await addDoc(backupsCol(), dump);
+    try { localStorage.setItem('derniereSauvegardeAutoDate', aujourdHui); } catch(e) {}
+    // Nettoyage : ne garder que les NB_BACKUPS_MAX sauvegardes les plus recentes
+    const snap = await getDocs(backupsCol());
+    const docs = snap.docs.map(d => ({ id: d.id, genereLe: d.data().genereLe || '' })).sort((a,b) => a.genereLe.localeCompare(b.genereLe));
+    if (docs.length > NB_BACKUPS_MAX) {
+      const aSupprimer = docs.slice(0, docs.length - NB_BACKUPS_MAX);
+      for (const d of aSupprimer) await deleteDoc(doc(db, 'backups', d.id));
+    }
+    console.log('Sauvegarde automatique effectuee (' + aujourdHui + ')');
+  } catch (e) {
+    console.error('Erreur sauvegarde automatique', e); // silencieux pour l'utilisateur : ne bloque jamais l'usage normal de l'appli
+  }
+}
+
+window.exportExcel = function() {
+  const ex = getEx();
+  const expSel = document.getElementById('export-campagne');
+  const campagne = (expSel ? expSel.value : null) || S.campagne;
+  const dateRecolte = (S.datesRecolte && S.datesRecolte[campagne]) || document.getElementById('export-recolte').value || '';
+  const passages = S.passages.filter(p => yearOf(p) === campagne && p.type !== 'engrais').sort((a,b) => toISO(a.date)<toISO(b.date)?-1:1);
+  const rows = [];
+
+  // ── TITRE ──
+  rows.push(['Fiche enregistrement phytosanitaires ' + campagne]);
+
+  // ── PAVÉ EXPLOITATION : A=label, B=valeur ──
+  rows.push(['Identification', ex.nom]);
+  rows.push(['SIRET:', {t:'s', v:String(ex.siret||'')}]);
+  if (ex.type !== 'agricole') rows.push(['Date de recolte:', dateRecolte]);
+
+  // ── LIGNE VIDE ──
+  rows.push([]);
+
+  // ── ENTETES PASSAGES : 1 colonne par passage, sans vides ──
+  rows.push(['Nbr. de passage', '', ...passages.map((_,i) => i+1)]);
+  rows.push(['Date de passage', '', ...passages.map(p => fmtDate(p.date))]);
+  rows.push(['DRE',             '', ...passages.map(p => parseInt(p.dre)||0)]);
+  rows.push(['IFT',             '', ...passages.map(p => { try { var v = (p.ift!==undefined && p.ift!==null ? p.ift : calcIFT(p)); return Number.isFinite(v) ? v : 0; } catch(e) { return 0; } })]);
+
+  // ── PRODUITS PAR CATEGORIE ──
+  // Sequence d'affichage fixee explicitement (l'ordre brut stocke en base est alphabetique,
+  // ce qui ne correspond pas a la lecture agronomique souhaitee) :
+  // Adjuvants, Biocontrole/SDN, Botrytis, Mildiou, Oidium, Nutrition foliaire, Herbicides, Insecticides.
+  // Toute categorie non prevue dans cette liste est ajoutee a la fin, dans son ordre d'origine.
+  const normCat = s => (s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const SEQUENCE = ['ADJUVANTS', 'BIOCONTROLE / SDN', 'BOTRYTIS', 'MILDIOU', 'OIDIUM', 'NUTRITION FOLIAIRE', 'HERBICIDES', 'INSECTICIDES'];
+  const catNamesRaw = [...new Set([...S.categories.map(c=>c.nom), ...S.produits.map(p=>p.cat)])];
+  const catNames = [...catNamesRaw].sort((a, b) => {
+    const ia = SEQUENCE.indexOf(normCat(a)), ib = SEQUENCE.indexOf(normCat(b));
+    if (ia === -1 && ib === -1) return catNamesRaw.indexOf(a) - catNamesRaw.indexOf(b);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+  catNames.forEach(cat => {
+    const noms = [], doses = [];
+    passages.forEach(p => {
+      const pp = (p.produitsList||[]).filter(pr => pr.cat === cat);
+      noms.push(pp.map(pr => pr.nom).join(' + ') || '');
+      doses.push(pp.map(pr => pr.qte ? pr.qte + ' ' + (pr.unite||'') : (pr.dose||'')).join(' / ') || '');
+    });
+    // Ligne vide avant chaque categorie (comme fichier original)
+    rows.push([]);
+    rows.push([cat, 'Nom', ...noms]);
+    rows.push(['',   'Qte', ...doses]);
+  });
+
+  // ── NOTES ──
+  const hasNotes = passages.some(p => p.notes && p.notes.trim());
+  if (hasNotes) {
+    rows.push([]);
+    rows.push(['Notes / observations', '', ...passages.map(p => {
+      const pct = (p.pourcentSurface && p.pourcentSurface < 100) ? p.pourcentSurface + '% de la surface traitee' : '';
+      return [pct, p.notes||''].filter(Boolean).join(' — ');
+    })]);
+  }
+
+  // ── APPLICATEUR ──
+  const hasExterne = passages.some(p => p.applicateurId);
+  if (hasExterne) {
+    rows.push(['Applicateur', '', ...passages.map(p => p.applicateurId ? (p.applicateurNom||'') : '')]);
+    rows.push(['SIRET applicateur', '', ...passages.map(p => p.applicateurId ? {t:'s',v:String(p.applicateurSiret||'')} : '')]);
+  }
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:22},{wch:14}, ...Array(Math.max(passages.length,1)).fill({wch:16})];
+  XLSX.utils.book_append_sheet(wb, ws, 'Traitements ' + campagne);
+
+  // ── ONGLET PARCELLES ──
+  const parcRows = [];
+  parcRows.push(['Identification', ex.nom]);
+  parcRows.push(['SIRET:', {t:'s', v:String(ex.siret||'')}]);
+  parcRows.push([]);
+  parcRows.push(['Code commune', 'Nom commune', 'Parcelle', 'Surface (ha)', 'Ilot', 'GPS']);
+  S.parcelles.forEach(p => parcRows.push([
+    p.commune||'', p.ville||'', p.nom, p.surface||'', p.ilot||'', p.gps||''
+  ]));
+  const wsP = XLSX.utils.aoa_to_sheet(parcRows);
+  wsP['!cols'] = [{wch:14},{wch:22},{wch:20},{wch:12},{wch:10},{wch:40}];
+  XLSX.utils.book_append_sheet(wb, wsP, 'Parcelles');
+
+  // ── ONGLET PRODUITS ──
+  // Collecter tous les produits distincts utilisés dans la campagne, par catégorie
+  const prodsUtilises = {}; // {cat: [{nom, amm}]}
+  passages.forEach(p => {
+    (p.produitsList||[]).forEach(pr => {
+      if (!prodsUtilises[pr.cat]) prodsUtilises[pr.cat] = [];
+      const exists = prodsUtilises[pr.cat].find(x => x.nom === pr.nom);
+      if (!exists) {
+        const base = S.produits.find(b => b.nom === pr.nom && b.cat === pr.cat);
+        prodsUtilises[pr.cat].push({nom: pr.nom, amm: (base && base.amm) ? base.amm : (pr.amm||'')});
+      }
+    });
+  });
+
+  // Structure : catégories en colonnes (3 colonnes par cat : Produits | AMM | vide)
+  const cats = Object.keys(prodsUtilises).sort();
+  const prodRows = [];
+
+  // Ligne titre
+  prodRows.push(['Produits utilises sur la campagne ' + campagne]);
+  prodRows.push(['Identification', ex.nom]);
+  prodRows.push(['SIRET:', {t:'s', v:String(ex.siret||'')}]);
+  prodRows.push([]);
+
+  // Ligne catégories
+  const catHeaderRow = [];
+  cats.forEach(cat => { catHeaderRow.push(cat, '', ''); });
+  prodRows.push(catHeaderRow);
+
+  // Ligne sous-entetes Produits / AMM
+  const subHeaderRow = [];
+  cats.forEach(() => { subHeaderRow.push('Produits', 'AMM', ''); });
+  prodRows.push(subHeaderRow);
+
+  // Lignes produits : autant de lignes que le max de produits dans une catégorie
+  const maxProds = Math.max(...cats.map(cat => prodsUtilises[cat].length), 0);
+  for (let i = 0; i < maxProds; i++) {
+    const row = [];
+    cats.forEach(cat => {
+      const prod = prodsUtilises[cat][i];
+      row.push(prod ? prod.nom : '', prod ? {t:'s',v:String(prod.amm||'')} : '', '');
+    });
+    prodRows.push(row);
+  }
+
+  const wsProd = XLSX.utils.aoa_to_sheet(prodRows);
+  // Largeur colonnes : 3 colonnes par catégorie (Produit=20, AMM=12, sep=2)
+  const prodCols = [];
+  cats.forEach(() => { prodCols.push({wch:22}, {wch:12}, {wch:2}); });
+  wsProd['!cols'] = prodCols;
+  XLSX.utils.book_append_sheet(wb, wsProd, 'Produits ' + campagne);
+
+  // ── ONGLET ENGRAIS ──
+  const passagesEng = S.passages.filter(p => yearOf(p) === campagne && p.type === 'engrais' && (p.engraisList||[]).length);
+  if (passagesEng.length) {
+    const engRows = [];
+    engRows.push(['Fertilisation ' + campagne]);
+    engRows.push(['Identification', ex.nom]);
+    engRows.push(['SIRET:', {t:'s', v:String(ex.siret||'')}]);
+    engRows.push([]);
+    engRows.push(['Date','Produit','Categorie','Dose','N (kg/ha)','P (kg/ha)','K (kg/ha)','MgO (kg/ha)','SO3 (kg/ha)','Fe (kg/ha)','Parcelles','Applicateur','Commentaires']);
+    const totaux = {n:0,p:0,k:0,mgo:0,so3:0,fe:0};
+    passagesEng.forEach(p => {
+      (p.engraisList||[]).forEach(e => {
+        const a = e.apportsCalcules || {};
+        engRows.push([
+          fmtDate(p.date), e.nom, e.categorie||'',
+          (e.qte||0) + ' ' + (e.unite||''),
+          a.n||0, a.p||0, a.k||0, a.mgo||0, a.so3||0, a.fe||0,
+          (p.parcelles||[]).join(' / '), (p.applicateurId ? (p.applicateurNom||'') : ex.nom), p.notes||''
+        ]);
+        ['n','p','k','mgo','so3','fe'].forEach(k => { totaux[k] += a[k]||0; });
+      });
+    });
+    engRows.push([]);
+    engRows.push(['Total apports campagne', '', '', '', totaux.n, totaux.p, totaux.k, totaux.mgo, totaux.so3, totaux.fe, '', '', '']);
+    const wsEng = XLSX.utils.aoa_to_sheet(engRows);
+    wsEng['!cols'] = [{wch:12},{wch:18},{wch:16},{wch:14},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:10},{wch:24},{wch:18},{wch:24}];
+    XLSX.utils.book_append_sheet(wb, wsEng, 'Engrais ' + campagne);
+  }
+
+  XLSX.writeFile(wb, 'Registre_phyto_' + ex.nom.replace(/\s/g,'_') + '_' + campagne + '.xlsx');
+  toast('Export Excel telecharge');
+};
+
+window.exportCSV = function() {
+  const ex = getEx();
+  const header = ['N Ilot','N Parcelle','Code commune','GPS','Culture','Label AB','Nom produit','N AMM','Date','Quantite','Surface','Mode','H debut','H fin','Cible','DRE','Stade','Applicateur','SIRET applicateur'];
+  const rows = [header];
+  const expSelCSV = document.getElementById('export-campagne');
+  const campagneCSV = (expSelCSV ? expSelCSV.value : null) || S.campagne;
+  S.passages.filter(p => yearOf(p) === campagneCSV).forEach(p => {
+    (p.produitsList||[]).forEach(pr => {
+      (p.parcelles||['']).forEach(parc => {
+        const pi = S.parcelles.find(pa=>pa.nom===parc)||{};
+        rows.push([pi.ilot||'',parc,pi.commune||'',pi.gps||'','Vigne',ex.ab?'Oui':'Non',pr.nom,pr.amm||'',fmtDate(p.date),(pr.qte ? pr.qte+' '+(pr.unite||'') : pr.dose||''),pi.surface||'','Plein air',p.heureDebut||'',p.heureFin||'',pr.cat,parseInt(pr.dre)||'',p.stade||'',p.applicateurNom||ex.nom,'='+JSON.stringify(String(p.applicateurSiret||ex.siret||''))]);
+      });
+    });
+  });
+  const csv = rows.map(r=>r.map(c=>'"'+String(c).replace(/"/g,'""')+'"').join(';')).join('\n');
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'Registre_reglementaire_' + ex.nom.replace(/\s/g,'_') + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+  toast('CSV reglementaire telecharge');
+};
+
+// ── DEMARRAGE ────────────────────────────────────────────────
+init();
+
+</script>
+</body>
+</html>
