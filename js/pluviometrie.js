@@ -11,7 +11,7 @@
 // (window.render = render / window.openModal = openModal), donc visibles depuis n'importe quel
 // module via la chaine de portee globale, meme sans import explicite.
 
-import { getDoc, setDoc, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getDoc, getDocs, setDoc, addDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { esc, toISO, confirm2, loading, normText, toast } from './utils.js';
 import { S, cpPassages } from './state.js';
 import { sub, subdoc } from './firebase-data.js';
@@ -707,6 +707,19 @@ async function confirmerImportCsv() {
   if (!mapping.length) { toast('Selectionnez au moins un site a importer', true); return; }
   loading(true);
   try {
+    // Sites meteo des AUTRES exploitations : on va les chercher directement en base (getDocs),
+    // plutot que de compter sur S.sitesMeteoByExploit qui n'est peuple que pour les exploitations
+    // deja activees au moins une fois durant la session en cours. Sans ca, une exploitation jamais
+    // consultee depuis le dernier rechargement de la page etait silencieusement ignoree lors de
+    // l'import, meme si elle possede un site du meme nom (bug identifie le 20/07/2026).
+    const autresExploitations = S.exploitations.filter(ex => ex.id !== S.currentId);
+    const sitesAutres = {}; // { exploitationId: [sites...] }
+    for (const ex of autresExploitations) {
+      const snap = await getDocs(sub(ex.id, 'sitesMeteo'));
+      sitesAutres[ex.id] = snap.docs.map(d => ({id: d.id, ...d.data()}));
+    }
+
+    const exploitsTouchees = new Set();
     for (const m of mapping) {
       // Regroupe les jours importes par annee (un document pluviometrie par site + annee)
       const parYear = {};
@@ -716,21 +729,35 @@ async function confirmerImportCsv() {
         const y = r.iso.slice(0, 4);
         (parYear[y] = parYear[y] || {})[r.iso] = val;
       });
+      // Ecrit dans l'exploitation active, PUIS dans toute autre exploitation possedant un site
+      // meteo du meme nom (station de reference partagee entre plusieurs exploitations proches,
+      // ex. CORRE/VADEZ) : un seul import CSV met a jour toutes les exploitations concernees,
+      // au lieu de forcer un import manuel par exploitation.
+      const cibles = [{ eid: S.currentId, siteId: m.site.id }];
+      const nomNorm = normText(m.site.nom);
+      autresExploitations.forEach(ex => {
+        const correspondance = (sitesAutres[ex.id] || []).find(s => normText(s.nom) === nomNorm);
+        if (correspondance) cibles.push({ eid: ex.id, siteId: correspondance.id });
+      });
       for (const [year, jours] of Object.entries(parYear)) {
-        const docId = m.site.id + '_' + year;
-        const existingSnap = await getDoc(subdoc(S.currentId, 'pluviometrie', docId));
-        const existingJours = existingSnap.exists() ? (existingSnap.data().jours || {}) : {};
-        // Les valeurs importees (station) ecrasent celles deja stockees (Open-Meteo) pour les memes jours
-        const merged = Object.assign({}, existingJours, jours);
-        await setDoc(subdoc(S.currentId, 'pluviometrie', docId),
-          { site: m.site.id, label: m.site.nom, annee: year, jours: merged, updatedAt: serverTimestamp() },
-          { merge: true });
+        for (const cible of cibles) {
+          const docId = cible.siteId + '_' + year;
+          const existingSnap = await getDoc(subdoc(cible.eid, 'pluviometrie', docId));
+          const existingJours = existingSnap.exists() ? (existingSnap.data().jours || {}) : {};
+          // Les valeurs importees (station) ecrasent celles deja stockees (Open-Meteo) pour les memes jours
+          const merged = Object.assign({}, existingJours, jours);
+          await setDoc(subdoc(cible.eid, 'pluviometrie', docId),
+            { site: cible.siteId, label: m.site.nom, annee: year, jours: merged, updatedAt: serverTimestamp() },
+            { merge: true });
+          exploitsTouchees.add(cible.eid);
+        }
       }
     }
+    autresExploitations.forEach(ex => { if (exploitsTouchees.has(ex.id)) forgetRainfallSync(ex.id); });
     resetRainfallSync();
     closeModal();
     render();
-    toast('Pluviometrie importee (' + mapping.length + ' site(s))');
+    toast('Pluviometrie importee (' + mapping.length + ' site(s), ' + exploitsTouchees.size + ' exploitation(s))');
   } catch (e) {
     toast('Erreur import : ' + e.message, true);
   } finally {
